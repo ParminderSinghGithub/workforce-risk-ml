@@ -1,0 +1,111 @@
+{
+  "execution_status": "SUCCESS",
+  "elapsed_seconds": 365.15,
+  "raw_input_path": "C:\\Projects\\Workforce-Risk-ML\\data\\raw\\synthetic-employee-dataset.json",
+  "cleaned_output_path": "C:\\Projects\\Workforce-Risk-ML\\data\\processed\\cleaned_workforce.parquet",
+  "data_quality_report_path": "C:\\Projects\\Workforce-Risk-ML\\reports\\data_quality\\data_quality_report.json",
+  "validation_report": {
+    "dataset_validation": {
+      "total_rows": 849999,
+      "total_columns": 31,
+      "columns": [
+        "employee_id",
+        "role",
+        "job_level",
+        "department",
+        "tenure_months",
+        "salary",
+        "performance_score",
+        "satisfaction_score",
+        "workload_score",
+        "team_sentiment",
+        "recent_feedback",
+        "communication_patterns",
+        "project_completion_rate",
+        "overtime_hours",
+        "training_participation",
+        "collaboration_score",
+        "technical_skills",
+        "soft_skills",
+        "email_sentiment",
+        "slack_activity",
+        "meeting_participation",
+        "goal_achievement_rate",
+        "stress_level",
+        "burnout_risk",
+        "left_company",
+        "turnover_reason",
+        "risk_factors_summary",
+        "turnover_probability_generated",
+        "persona_name",
+        "role_complexity_score",
+        "career_progression_score"
+      ],
+      "employee_id_unique": true,
+      "duplicate_employee_ids": 0,
+      "null_summary": {
+        "employee_id": 0,
+        "role": 0,
+        "job_level": 0,
+        "department": 0,
+        "tenure_months": 0,
+        "salary": 0,
+        "performance_score": 0,
+        "satisfaction_score": 0,
+        "workload_score": 0,
+        "team_sentiment": 0,
+        "recent_feedback": 0,
+        "communication_patterns": 0,
+        "project_completion_rate": 0,
+        "overtime_hours": 0,
+        "training_participation": 0,
+        "collaboration_score": 0,
+        "technical_skills": 0,
+        "soft_skills": 0,
+        "email_sentiment": 0,
+        "slack_activity": 0,
+        "meeting_participation": 0,
+        "goal_achievement_rate": 0,
+        "stress_level": 0,
+        "burnout_risk": 0,
+        "left_company": 0,
+        "turnover_reason": 0,
+        "risk_factors_summary": 0,
+        "turnover_probability_generated": 0,
+        "persona_name": 0,
+        "role_complexity_score": 0,
+        "career_progression_score": 0
+      }
+    },
+    "target_validation": {
+      "target_column": "left_company",
+      "is_valid_binary": true,
+      "distribution": {
+        "True": {
+          "count": 242526,
+          "percentage": 28.5325
+        },
+        "False": {
+          "count": 607473,
+          "percentage": 71.4675
+        }
+      }
+    },
+    "text_validation": {
+      "text_column": "recent_feedback",
+      "valid_count": 849999,
+      "empty_count": 0,
+      "unique_count": 1000
+    },
+    "leakage_columns_preserved": {
+      "expected": [
+        "employee_id",
+        "turnover_reason",
+        "turnover_probability_generated",
+        "risk_factors_summary",
+        "burnout_risk"
+      ],
+      "all_present": true
+    }
+  }
+}

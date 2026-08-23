@@ -16,6 +16,7 @@ data/splits/*
 *.arrow
 *.json
 !configs/*.json
+!reports/**/*.json
 !*.jsonl
 
 # Model Artifacts, Checkpoints & Weights
