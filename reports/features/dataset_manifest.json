@@ -1,0 +1,157 @@
+{
+  "creation_timestamp": "2026-08-23T20:13:45Z",
+  "total_employee_records": 849999,
+  "random_seed": 42,
+  "structured_modality": {
+    "strategy": "stratified_by_target",
+    "target_variable": "left_company",
+    "feature_count": 29,
+    "features": [
+      "tenure_months",
+      "salary",
+      "performance_score",
+      "satisfaction_score",
+      "workload_score",
+      "team_sentiment",
+      "project_completion_rate",
+      "overtime_hours",
+      "training_participation",
+      "collaboration_score",
+      "email_sentiment",
+      "slack_activity",
+      "meeting_participation",
+      "goal_achievement_rate",
+      "stress_level",
+      "role_complexity_score",
+      "career_progression_score",
+      "num_technical_skills",
+      "num_soft_skills",
+      "tenure_years",
+      "workload_stress_interaction",
+      "satisfaction_workload_gap",
+      "overtime_intensity",
+      "engagement_score",
+      "department_idx",
+      "job_level_idx",
+      "role_idx",
+      "communication_patterns_idx",
+      "persona_name_idx"
+    ],
+    "splits": {
+      "train": {
+        "count": 679662,
+        "percentage": 79.9603,
+        "distribution": {
+          "0": {
+            "count": 485445,
+            "percentage": 71.4245
+          },
+          "1": {
+            "count": 194217,
+            "percentage": 28.5755
+          }
+        },
+        "parquet_path": "C:\\Projects\\Workforce-Risk-ML\\data\\splits\\structured_train.parquet"
+      },
+      "validation": {
+        "count": 85241,
+        "percentage": 10.0284,
+        "distribution": {
+          "0": {
+            "count": 61127,
+            "percentage": 71.7108
+          },
+          "1": {
+            "count": 24114,
+            "percentage": 28.2892
+          }
+        },
+        "parquet_path": "C:\\Projects\\Workforce-Risk-ML\\data\\splits\\structured_validation.parquet"
+      },
+      "test": {
+        "count": 85096,
+        "percentage": 10.0113,
+        "distribution": {
+          "0": {
+            "count": 60901,
+            "percentage": 71.5674
+          },
+          "1": {
+            "count": 24195,
+            "percentage": 28.4326
+          }
+        },
+        "parquet_path": "C:\\Projects\\Workforce-Risk-ML\\data\\splits\\structured_test.parquet"
+      }
+    }
+  },
+  "text_modality": {
+    "strategy": "grouped_by_feedback_template",
+    "text_field": "recent_feedback",
+    "target_variable": "high_burnout_risk",
+    "burnout_threshold": 0.75,
+    "template_overlap_between_splits": 0,
+    "splits": {
+      "train": {
+        "count": 679814,
+        "percentage": 79.9782,
+        "unique_templates": 801,
+        "distribution": {
+          "1": {
+            "count": 401386,
+            "percentage": 59.0435
+          },
+          "0": {
+            "count": 278428,
+            "percentage": 40.9565
+          }
+        },
+        "parquet_path": "C:\\Projects\\Workforce-Risk-ML\\data\\splits\\text_train.parquet"
+      },
+      "validation": {
+        "count": 84988,
+        "percentage": 9.9986,
+        "unique_templates": 98,
+        "distribution": {
+          "0": {
+            "count": 34524,
+            "percentage": 40.6222
+          },
+          "1": {
+            "count": 50464,
+            "percentage": 59.3778
+          }
+        },
+        "parquet_path": "C:\\Projects\\Workforce-Risk-ML\\data\\splits\\text_validation.parquet"
+      },
+      "test": {
+        "count": 85197,
+        "percentage": 10.0232,
+        "unique_templates": 101,
+        "distribution": {
+          "1": {
+            "count": 49477,
+            "percentage": 58.0736
+          },
+          "0": {
+            "count": 35720,
+            "percentage": 41.9264
+          }
+        },
+        "parquet_path": "C:\\Projects\\Workforce-Risk-ML\\data\\splits\\text_test.parquet"
+      }
+    }
+  },
+  "leakage_exclusions": {
+    "excluded_columns": [
+      "employee_id",
+      "turnover_reason",
+      "turnover_probability_generated",
+      "risk_factors_summary",
+      "burnout_risk",
+      "left_company",
+      "recent_feedback"
+    ],
+    "status": "VERIFIED_EXCLUDED"
+  }
+}

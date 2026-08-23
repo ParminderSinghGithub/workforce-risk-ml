@@ -1,0 +1,321 @@
+{
+  "total_structured_features": 29,
+  "feature_count_by_type": {
+    "numeric": 24,
+    "categorical": 5
+  },
+  "features": [
+    {
+      "feature_name": "tenure_months",
+      "source_columns": [
+        "tenure_months"
+      ],
+      "feature_type": "numeric",
+      "transformation": "raw_integer_to_double",
+      "description": "Total employee tenure in months",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "salary",
+      "source_columns": [
+        "salary"
+      ],
+      "feature_type": "numeric",
+      "transformation": "raw_continuous_compensation",
+      "description": "Annual salary in USD",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "performance_score",
+      "source_columns": [
+        "performance_score"
+      ],
+      "feature_type": "numeric",
+      "transformation": "raw_score_continuous",
+      "description": "Performance evaluation score [0, 1]",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "satisfaction_score",
+      "source_columns": [
+        "satisfaction_score"
+      ],
+      "feature_type": "numeric",
+      "transformation": "raw_score_continuous",
+      "description": "Employee reported satisfaction score [0, 1]",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "workload_score",
+      "source_columns": [
+        "workload_score"
+      ],
+      "feature_type": "numeric",
+      "transformation": "raw_score_continuous",
+      "description": "Reported workload burden score [0, 1]",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "team_sentiment",
+      "source_columns": [
+        "team_sentiment"
+      ],
+      "feature_type": "numeric",
+      "transformation": "raw_score_continuous",
+      "description": "Peer and team collaboration sentiment score [0, 1]",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "project_completion_rate",
+      "source_columns": [
+        "project_completion_rate"
+      ],
+      "feature_type": "numeric",
+      "transformation": "raw_rate_continuous",
+      "description": "Historical project delivery completion rate [0, 1]",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "overtime_hours",
+      "source_columns": [
+        "overtime_hours"
+      ],
+      "feature_type": "numeric",
+      "transformation": "raw_hours_continuous",
+      "description": "Weekly overtime hours",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "training_participation",
+      "source_columns": [
+        "training_participation"
+      ],
+      "feature_type": "numeric",
+      "transformation": "raw_score_continuous",
+      "description": "Internal training and upskilling participation rate [0, 1]",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "collaboration_score",
+      "source_columns": [
+        "collaboration_score"
+      ],
+      "feature_type": "numeric",
+      "transformation": "raw_score_continuous",
+      "description": "Cross-functional collaboration rating [0, 1]",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "email_sentiment",
+      "source_columns": [
+        "email_sentiment"
+      ],
+      "feature_type": "numeric",
+      "transformation": "raw_score_continuous",
+      "description": "Aggregated email communication tone sentiment [0, 1]",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "slack_activity",
+      "source_columns": [
+        "slack_activity"
+      ],
+      "feature_type": "numeric",
+      "transformation": "raw_score_continuous",
+      "description": "Normalized messaging and interaction frequency [0, 1]",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "meeting_participation",
+      "source_columns": [
+        "meeting_participation"
+      ],
+      "feature_type": "numeric",
+      "transformation": "raw_score_continuous",
+      "description": "Meeting attendance and active contribution score [0, 1]",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "goal_achievement_rate",
+      "source_columns": [
+        "goal_achievement_rate"
+      ],
+      "feature_type": "numeric",
+      "transformation": "raw_rate_continuous",
+      "description": "Quarterly target and KPI goal fulfillment rate [0, 1]",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "stress_level",
+      "source_columns": [
+        "stress_level"
+      ],
+      "feature_type": "numeric",
+      "transformation": "raw_score_continuous",
+      "description": "Reported physiological and mental stress index [0, 1]",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "role_complexity_score",
+      "source_columns": [
+        "role_complexity_score"
+      ],
+      "feature_type": "numeric",
+      "transformation": "raw_score_continuous",
+      "description": "Objective job complexity and cognitive demand score [0, 1]",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "career_progression_score",
+      "source_columns": [
+        "career_progression_score"
+      ],
+      "feature_type": "numeric",
+      "transformation": "raw_score_continuous",
+      "description": "Internal mobility and advancement trajectory score [0, 1]",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "num_technical_skills",
+      "source_columns": [
+        "technical_skills"
+      ],
+      "feature_type": "numeric",
+      "transformation": "array_size(technical_skills)",
+      "description": "Total count of documented technical skill competencies",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "num_soft_skills",
+      "source_columns": [
+        "soft_skills"
+      ],
+      "feature_type": "numeric",
+      "transformation": "array_size(soft_skills)",
+      "description": "Total count of documented interpersonal competencies",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "tenure_years",
+      "source_columns": [
+        "tenure_months"
+      ],
+      "feature_type": "numeric",
+      "transformation": "tenure_months / 12.0",
+      "description": "Calculated organizational tenure in decimal years",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "workload_stress_interaction",
+      "source_columns": [
+        "workload_score",
+        "stress_level"
+      ],
+      "feature_type": "numeric",
+      "transformation": "workload_score * stress_level",
+      "description": "Multiplicative interaction measuring compounding burnout pressure",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "satisfaction_workload_gap",
+      "source_columns": [
+        "satisfaction_score",
+        "workload_score"
+      ],
+      "feature_type": "numeric",
+      "transformation": "satisfaction_score - workload_score",
+      "description": "Differential measuring friction between job sentiment and workload demand",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "overtime_intensity",
+      "source_columns": [
+        "overtime_hours"
+      ],
+      "feature_type": "numeric",
+      "transformation": "overtime_hours / (overtime_hours + 40.0)",
+      "description": "Bounded non-linear overtime burden ratio in [0, 1)",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "engagement_score",
+      "source_columns": [
+        "slack_activity",
+        "meeting_participation",
+        "collaboration_score"
+      ],
+      "feature_type": "numeric",
+      "transformation": "(slack_activity + meeting_participation + collaboration_score) / 3.0",
+      "description": "Composite index reflecting multi-channel workplace engagement",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "department_idx",
+      "source_columns": [
+        "department"
+      ],
+      "feature_type": "categorical",
+      "transformation": "string_indexer(department)",
+      "description": "Ordinal integer index for corporate department",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "job_level_idx",
+      "source_columns": [
+        "job_level"
+      ],
+      "feature_type": "categorical",
+      "transformation": "string_indexer(job_level)",
+      "description": "Ordinal integer index for seniority level",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "role_idx",
+      "source_columns": [
+        "role"
+      ],
+      "feature_type": "categorical",
+      "transformation": "string_indexer(role)",
+      "description": "Ordinal integer index for professional job title",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "communication_patterns_idx",
+      "source_columns": [
+        "communication_patterns"
+      ],
+      "feature_type": "categorical",
+      "transformation": "string_indexer(communication_patterns)",
+      "description": "Ordinal integer index for primary communication style",
+      "used_by_structured_model": true
+    },
+    {
+      "feature_name": "persona_name_idx",
+      "source_columns": [
+        "persona_name"
+      ],
+      "feature_type": "categorical",
+      "transformation": "string_indexer(persona_name)",
+      "description": "Ordinal integer index for archetype persona cluster",
+      "used_by_structured_model": true
+    }
+  ],
+  "excluded_columns": {
+    "columns": [
+      "employee_id",
+      "turnover_reason",
+      "turnover_probability_generated",
+      "risk_factors_summary",
+      "burnout_risk",
+      "left_company",
+      "recent_feedback"
+    ],
+    "count": 7,
+    "rationale": "Mandatory leakage exclusions, target variables, identifiers, and cross-modality text field."
+  },
+  "target_variable": {
+    "name": "left_company",
+    "type": "binary_integer",
+    "description": "Primary prediction target (1 = left company, 0 = retained)"
+  }
+}
