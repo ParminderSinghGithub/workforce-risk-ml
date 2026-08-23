@@ -2,21 +2,57 @@
 .venv/
 venv/
 ENV/
+env/
 
-# Data directories (Raw and processed datasets must NOT be committed)
-data/
+# Data Directories (Raw, Processed, and Split datasets must NEVER be committed)
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/splits/*
+!data/splits/.gitkeep
 *.parquet
 *.csv
 *.arrow
+*.json
+!configs/*.json
+!*.jsonl
 
-# Python caches
+# Model Artifacts, Checkpoints & Weights
+models/
+checkpoints/
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.onnx
+
+# Hugging Face & Cache Directories
+.cache/
+hf_cache/
+
+# Python & Testing Caches
 __pycache__/
 *.py[cod]
 *$py.class
+*.egg-info/
+src/*.egg-info/
 .pytest_cache/
+.coverage
+htmlcov/
 
-# IDE / System
+# Logs & Temporary Files
+logs/
+*.log
+scratch/
+
+# IDE & OS Metadata
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Secrets & Environment Variables
+.env
+.env.*
+!.env.example

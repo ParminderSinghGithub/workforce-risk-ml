@@ -1,0 +1,77 @@
+# Workforce Risk ML System — Central Project Configuration
+# Frozen Project Specification Constants
+
+project:
+  name: "workforce-risk-ml-system"
+  version: "0.1.0"
+  seed: 42
+
+dataset:
+  repository: "Umer112233/employee-burnout-turnover-prediction-800k"
+  revision: "8d35f5bdcd0b7ff0ea04a5d5e93132eaae630e52"
+  raw_file: "synthetic-employee-dataset.json"
+
+targets:
+  structured_target: "left_company"
+  text_target_derived: "high_burnout_risk"
+  burnout_threshold: 0.75
+
+features:
+  text_column: "recent_feedback"
+  leakage_exclusions:
+    - "employee_id"
+    - "turnover_reason"
+    - "turnover_probability_generated"
+    - "risk_factors_summary"
+    - "burnout_risk"
+
+splits:
+  train_ratio: 0.80
+  val_ratio: 0.10
+  test_ratio: 0.10
+  structured_strategy: "stratified"
+  text_strategy: "group_template"
+
+sampling:
+  structured_train_size: 100000
+  text_sample_min: 5000
+  text_sample_max: 10000
+  text_sample_target: 10000
+
+models:
+  structured:
+    architecture: "mlp"
+    hidden_dims: [128, 64, 32]
+    dropout: 0.2
+    batch_size: 256
+    learning_rate: 0.001
+    epochs: 20
+
+  text:
+    base_model: "distilbert-base-uncased"
+    max_length: 256
+    batch_size: 32
+    learning_rate: 0.0002
+    epochs: 3
+    lora:
+      r: 16
+      lora_alpha: 32
+      target_modules:
+        - "q_lin"
+        - "v_lin"
+      lora_dropout: 0.05
+      bias: "none"
+
+  fusion:
+    architecture: "late_fusion_mlp"
+    input_dim: 2  # [p_structured, p_text]
+    hidden_dims: [16, 8]
+    learning_rate: 0.001
+    epochs: 15
+
+paths:
+  data_raw_dir: "data/raw"
+  data_processed_dir: "data/processed"
+  data_splits_dir: "data/splits"
+  models_dir: "models"
+  reports_dir: "reports"
