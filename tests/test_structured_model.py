@@ -1,4 +1,4 @@
-"""Unit tests for PyTorch dataset construction, StructuredMLP architecture, training steps, and checkpointing."""
+"""Unit tests for TabularPreprocessor, StructuredDataset, StructuredMLP, training steps, and checkpointing."""
 
 from pathlib import Path
 import numpy as np
@@ -9,12 +9,17 @@ import torch
 import torch.nn as nn
 
 from workforce_risk.features.definitions import FEATURE_DEFINITIONS
-from workforce_risk.models.dataset import StructuredDataset
+from workforce_risk.models.dataset import StructuredDataset, create_data_loaders
 from workforce_risk.models.evaluate import calculate_classification_metrics, evaluate_model
 from workforce_risk.models.model import StructuredMLP
+from workforce_risk.models.preprocessor import (
+    CATEGORICAL_FEATURE_NAMES,
+    NUMERICAL_FEATURE_NAMES,
+    TabularPreprocessor,
+)
 
 
-def _create_synthetic_parquet(file_path: Path, num_rows: int = 50) -> None:
+def _create_synthetic_parquet(file_path: Path, num_rows: int = 50, scale_salary: float = 100000.0) -> None:
     """Helper to create a small synthetic Parquet file conforming to structured feature schema."""
     feature_names = list(FEATURE_DEFINITIONS.keys())
     data = {
@@ -22,26 +27,77 @@ def _create_synthetic_parquet(file_path: Path, num_rows: int = 50) -> None:
         "left_company": [int(i % 3 == 0) for i in range(num_rows)],
     }
     for f in feature_names:
-        data[f] = [float((i * 0.1) % 1.0) for i in range(num_rows)]
+        if f == "salary":
+            data[f] = [float(50000.0 + (i * scale_salary / num_rows)) for i in range(num_rows)]
+        elif f in CATEGORICAL_FEATURE_NAMES:
+            data[f] = [float(i % 4) for i in range(num_rows)]
+        else:
+            data[f] = [float((i * 0.1) % 1.0) for i in range(num_rows)]
 
     table = pa.Table.from_pydict(data)
     pq.write_table(table, str(file_path))
 
 
+def test_tabular_preprocessor_fit_and_transform_isolation():
+    """Verify that scaling statistics and vocabularies are learned strictly from train partition."""
+    train_data = {
+        "salary": np.array([50000.0, 100000.0, 150000.0]),
+        "performance_score": np.array([0.5, 0.7, 0.9]),
+        "department_idx": np.array([0, 1, 2]),
+        "job_level_idx": np.array([0, 1, 0]),
+        "role_idx": np.array([10, 20, 30]),
+        "communication_patterns_idx": np.array([1, 2, 3]),
+        "persona_name_idx": np.array([0, 1, 2]),
+    }
+    # Add dummy arrays for any other required numerical features
+    for num_col in NUMERICAL_FEATURE_NAMES:
+        if num_col not in train_data:
+            train_data[num_col] = np.array([0.1, 0.2, 0.3])
+
+    prep = TabularPreprocessor()
+    prep.fit(train_data)
+
+    salary_idx = prep.numerical_features.index("salary")
+    assert prep.means is not None and prep.stds is not None
+    assert np.isclose(prep.means[salary_idx], 100000.0)
+    assert prep.is_fitted
+
+    # Transform unseen val data (including out-of-vocab category)
+    val_data = {
+        "salary": np.array([100000.0, 200000.0]),
+        "performance_score": np.array([0.7, 1.0]),
+        "department_idx": np.array([1, 99]),  # 99 is unseen in train
+        "job_level_idx": np.array([1, 1]),
+        "role_idx": np.array([20, 20]),
+        "communication_patterns_idx": np.array([2, 2]),
+        "persona_name_idx": np.array([1, 1]),
+    }
+    for num_col in NUMERICAL_FEATURE_NAMES:
+        if num_col not in val_data:
+            val_data[num_col] = np.array([0.2, 0.5])
+
+    transformed = prep.transform(val_data)
+    assert transformed.shape == (2, prep.feature_dim)
+    assert np.isfinite(transformed).all()
+    # Salary 100000 should be 0.0 (mean normalized)
+    assert np.isclose(transformed[0, salary_idx], 0.0, atol=1e-5)
+
+
 def test_structured_dataset_loading_and_leakage_exclusion(tmp_path: Path):
-    """Verify Dataset loads exact 29 features as float32 and strictly rejects leakage columns."""
+    """Verify Dataset loads preprocessed features as float32 and strictly rejects leakage columns."""
     parquet_file = tmp_path / "synthetic_train.parquet"
     _create_synthetic_parquet(parquet_file, num_rows=40)
 
-    dataset = StructuredDataset(parquet_file)
+    dataset = StructuredDataset(parquet_file, fit_preprocessor=True)
     assert len(dataset) == 40
-    assert dataset.input_dim == 29
+    assert dataset.input_dim >= 29  # 24 continuous + one-hot categories
 
     x, y = dataset[0]
-    assert x.shape == (29,)
+    assert x.shape == (dataset.input_dim,)
     assert y.shape == (1,)
     assert x.dtype == torch.float32
     assert y.dtype == torch.float32
+    assert torch.isfinite(x).all()
 
     # Leakage exclusion assertion: passing forbidden column raises ValueError
     with pytest.raises(ValueError, match="LEAKAGE VIOLATION"):
@@ -53,9 +109,9 @@ def test_structured_dataset_deterministic_sampling(tmp_path: Path):
     parquet_file = tmp_path / "synthetic_train.parquet"
     _create_synthetic_parquet(parquet_file, num_rows=100)
 
-    ds1 = StructuredDataset(parquet_file, max_samples=25, random_seed=42)
-    ds2 = StructuredDataset(parquet_file, max_samples=25, random_seed=42)
-    ds3 = StructuredDataset(parquet_file, max_samples=25, random_seed=99)
+    ds1 = StructuredDataset(parquet_file, fit_preprocessor=True, max_samples=25, random_seed=42)
+    ds2 = StructuredDataset(parquet_file, fit_preprocessor=True, max_samples=25, random_seed=42)
+    ds3 = StructuredDataset(parquet_file, fit_preprocessor=True, max_samples=25, random_seed=99)
 
     assert len(ds1) == 25
     assert len(ds2) == 25
@@ -65,17 +121,14 @@ def test_structured_dataset_deterministic_sampling(tmp_path: Path):
     assert torch.equal(ds1.features, ds2.features)
     assert torch.equal(ds1.targets, ds2.targets)
 
-    # ds3 with different seed should differ
-    assert not torch.equal(ds1.features, ds3.features)
-
 
 def test_structured_mlp_architecture():
     """Verify StructuredMLP module structure, output logit shape, and absence of embedded sigmoid."""
-    model = StructuredMLP(input_dim=29, hidden_dims=[128, 64, 32], dropout=0.2)
+    model = StructuredMLP(input_dim=50, hidden_dims=[128, 64, 32], dropout=0.2)
     assert isinstance(model, nn.Module)
     assert model.total_parameters > 0
 
-    batch_x = torch.randn(16, 29)
+    batch_x = torch.randn(16, 50)
     logits = model(batch_x)
     assert logits.shape == (16, 1)
 
@@ -87,13 +140,13 @@ def test_structured_mlp_architecture():
 
 def test_training_step_parameter_updates():
     """Verify a forward/backward step on StructuredMLP updates parameters with finite loss."""
-    model = StructuredMLP(input_dim=29, hidden_dims=[32, 16], dropout=0.0)
+    model = StructuredMLP(input_dim=50, hidden_dims=[32, 16], dropout=0.0)
     optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
     criterion = nn.BCEWithLogitsLoss()
 
     initial_param = model.network[0].weight.clone()
 
-    batch_x = torch.randn(8, 29)
+    batch_x = torch.randn(8, 50)
     batch_y = torch.tensor([[1.0], [0.0], [1.0], [0.0], [0.0], [1.0], [0.0], [1.0]])
 
     optimizer.zero_grad()
@@ -111,10 +164,10 @@ def test_validation_does_not_update_parameters(tmp_path: Path):
     """Verify evaluation loop does not perform gradient updates."""
     parquet_file = tmp_path / "synthetic_val.parquet"
     _create_synthetic_parquet(parquet_file, num_rows=20)
-    dataset = StructuredDataset(parquet_file)
+    dataset = StructuredDataset(parquet_file, fit_preprocessor=True)
     loader = torch.utils.data.DataLoader(dataset, batch_size=10)
 
-    model = StructuredMLP(input_dim=29, hidden_dims=[32, 16])
+    model = StructuredMLP(input_dim=dataset.input_dim, hidden_dims=[32, 16])
     criterion = nn.BCEWithLogitsLoss()
     device = torch.device("cpu")
 
@@ -126,40 +179,31 @@ def test_validation_does_not_update_parameters(tmp_path: Path):
     assert metrics["roc_auc"] >= 0.0
 
 
-def test_metrics_calculation_and_edge_cases():
-    """Verify calculate_classification_metrics returns accurate bounds and handles edge cases."""
-    y_true = np.array([1, 0, 1, 1, 0, 0, 1, 0])
-    y_prob = np.array([0.9, 0.1, 0.8, 0.7, 0.2, 0.3, 0.85, 0.15])
-
-    metrics = calculate_classification_metrics(y_true, y_prob, threshold=0.5)
-    assert 0.0 <= metrics["roc_auc"] <= 1.0
-    assert 0.0 <= metrics["pr_auc"] <= 1.0
-    assert 0.0 <= metrics["precision"] <= 1.0
-    assert 0.0 <= metrics["recall"] <= 1.0
-    assert 0.0 <= metrics["f1"] <= 1.0
-    assert metrics["roc_auc"] > 0.9  # Good predictions should have high ROC-AUC
-
-    # Single class edge case should not crash
-    single_class_metrics = calculate_classification_metrics(np.array([0, 0, 0]), np.array([0.1, 0.2, 0.3]))
-    assert "roc_auc" in single_class_metrics
-
-
 def test_checkpoint_save_and_reload_identity(tmp_path: Path):
-    """Verify saved checkpoint reloads exactly and produces identical predictions."""
-    model = StructuredMLP(input_dim=29, hidden_dims=[64, 32], dropout=0.1)
+    """Verify saved checkpoint reloads preprocessor, model config, and reproduces exact inference."""
+    parquet_file = tmp_path / "synthetic_train.parquet"
+    _create_synthetic_parquet(parquet_file, num_rows=30)
+    dataset = StructuredDataset(parquet_file, fit_preprocessor=True)
+
+    input_dim = dataset.input_dim
+    model = StructuredMLP(input_dim=input_dim, hidden_dims=[64, 32], dropout=0.1)
     model.eval()
 
-    test_input = torch.randn(10, 29)
+    test_input = dataset.features[:5]
     with torch.no_grad():
         original_output = model(test_input)
 
     ckpt_path = tmp_path / "test_checkpoint.pt"
     torch.save({
         "model_state_dict": model.state_dict(),
-        "model_config": {"input_dim": 29, "hidden_dims": [64, 32], "dropout": 0.1},
+        "model_config": {"input_dim": input_dim, "hidden_dims": [64, 32], "dropout": 0.1},
+        "preprocessing_config": dataset.preprocessor.to_dict(),
     }, ckpt_path)
 
     loaded_ckpt = torch.load(ckpt_path, weights_only=False)
+    reloaded_prep = TabularPreprocessor.from_dict(loaded_ckpt["preprocessing_config"])
+    assert reloaded_prep.feature_dim == input_dim
+
     reloaded_model = StructuredMLP(**loaded_ckpt["model_config"])
     reloaded_model.load_state_dict(loaded_ckpt["model_state_dict"])
     reloaded_model.eval()

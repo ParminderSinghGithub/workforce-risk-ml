@@ -4,16 +4,17 @@ import argparse
 import json
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
-import numpy as np
+from typing import Any, Dict, List, Optional
 import torch
 import torch.nn as nn
 from torch.optim import AdamW
 
 from workforce_risk.config import get_config
+from workforce_risk.features.definitions import FEATURE_DEFINITIONS
 from workforce_risk.models.dataset import create_data_loaders
 from workforce_risk.models.evaluate import evaluate_model
 from workforce_risk.models.model import StructuredMLP
+from workforce_risk.models.preprocessor import TabularPreprocessor
 from workforce_risk.utils.seed import set_seed
 
 
@@ -77,9 +78,9 @@ def train_structured_model(
     device = get_device(device_str)
     print(f"[Training] Initializing StructuredMLP on device: {device}")
 
-    # 1. Create DataLoaders
+    # 1. Create DataLoaders with preprocessing fitted ONLY on training split
     print(f"[Training] Loading DataLoaders (smoke sample limits: train={max_train_samples}, val={max_val_samples})...")
-    train_loader, val_loader, test_loader, feature_names = create_data_loaders(
+    train_loader, val_loader, test_loader, preprocessor = create_data_loaders(
         train_path=train_path,
         val_path=val_path,
         test_path=test_path,
@@ -90,13 +91,14 @@ def train_structured_model(
         random_seed=seed,
     )
 
-    input_dim = len(feature_names)
+    input_dim = preprocessor.feature_dim
     model = StructuredMLP(
         input_dim=input_dim,
         hidden_dims=hidden_dims,
         dropout=dropout,
     ).to(device)
 
+    print(f"[Training] Encoded Features: {input_dim} (24 continuous + {input_dim - 24} one-hot categorical)")
     print(f"[Training] Architecture: {input_dim} -> {hidden_dims} -> 1 (Total params: {model.total_parameters})")
 
     criterion = nn.BCEWithLogitsLoss()
@@ -171,7 +173,7 @@ def train_structured_model(
             best_epoch = epoch
             epochs_no_improve = 0
 
-            # Save best checkpoint
+            # Save best checkpoint with full preprocessing contract
             checkpoint_data = {
                 "model_state_dict": model.state_dict(),
                 "model_config": {
@@ -179,7 +181,9 @@ def train_structured_model(
                     "hidden_dims": hidden_dims,
                     "dropout": dropout,
                 },
-                "feature_names": feature_names,
+                "preprocessing_config": preprocessor.to_dict(),
+                "encoded_feature_names": preprocessor.encoded_feature_names,
+                "raw_feature_names": list(FEATURE_DEFINITIONS.keys()),
                 "training_config": {
                     "batch_size": batch_size,
                     "learning_rate": learning_rate,
@@ -210,8 +214,11 @@ def train_structured_model(
     best_model.load_state_dict(saved_ckpt["model_state_dict"])
     best_model.eval()
 
+    # Reconstitute preprocessor from checkpoint
+    _ = TabularPreprocessor.from_dict(saved_ckpt["preprocessing_config"])
+
     # Re-evaluate reloaded model on validation set to verify consistency
-    _, reloaded_val_metrics, _, reloaded_val_probs = evaluate_model(
+    _, reloaded_val_metrics, _, _ = evaluate_model(
         model=best_model,
         data_loader=val_loader,
         criterion=criterion,
@@ -219,7 +226,7 @@ def train_structured_model(
     )
 
     # Evaluate on final test set (untouched during training)
-    test_loss, test_metrics, _, test_probs = evaluate_model(
+    test_loss, test_metrics, _, _ = evaluate_model(
         model=best_model,
         data_loader=test_loader,
         criterion=criterion,
