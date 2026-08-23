@@ -4,16 +4,25 @@ venv/
 ENV/
 env/
 
-# Data Directories (Raw, Processed, and Split datasets must NEVER be committed)
+# Explicitly ensure source code is tracked
+!src/
+!src/**
+
+# Data Directories, Archives & Datasets
 data/raw/*
 !data/raw/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
 data/splits/*
 !data/splits/.gitkeep
+workforce-risk-structured-data/
+workforce-risk-structured-data.zip
 *.parquet
 *.csv
 *.arrow
+*.zip
+*.tar
+*.tar.gz
 *.json
 !configs/*.json
 !reports/**/*.json
@@ -21,7 +30,6 @@ data/splits/*
 
 # Model Artifacts, Checkpoints & Weights
 artifacts/
-/models/
 checkpoints/
 *.pt
 *.pth
