@@ -1,7 +1,9 @@
 """Numerical scaling and categorical one-hot encoding for tabular PyTorch model."""
 
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 import numpy as np
+import pyarrow.parquet as pq
 
 from workforce_risk.features.definitions import FEATURE_DEFINITIONS
 
@@ -20,7 +22,7 @@ NUMERICAL_FEATURE_NAMES: List[str] = [
 
 
 class TabularPreprocessor:
-    """Numerical standardizer and categorical one-hot encoder fitted strictly on training data.
+    """Numerical standardizer and categorical one-hot encoder fitted strictly on the full training partition.
 
     Preserves exact learned parameters (means, standard deviations, categorical vocabularies)
     for deterministic inference and checkpoint reproducibility.
@@ -41,7 +43,7 @@ class TabularPreprocessor:
         self.is_fitted: bool = False
 
     def fit(self, data_dict: Dict[str, np.ndarray]) -> "TabularPreprocessor":
-        """Fit standardization statistics and categorical vocabularies on training partition."""
+        """Fit standardization statistics and categorical vocabularies on given training data dictionary."""
         # 1. Numerical scaling statistics
         num_matrix = np.column_stack(
             [data_dict[col].astype(np.float32) for col in self.numerical_features]
@@ -65,6 +67,28 @@ class TabularPreprocessor:
         self.encoded_feature_names = encoded_names
         self.is_fitted = True
         return self
+
+    @classmethod
+    def fit_from_parquet(
+        cls,
+        parquet_path: str | Path,
+        numerical_features: Optional[List[str]] = None,
+        categorical_features: Optional[List[str]] = None,
+    ) -> "TabularPreprocessor":
+        """Fit preprocessor on the COMPLETE training Parquet partition before any sampling step."""
+        preprocessor = cls(
+            numerical_features=numerical_features,
+            categorical_features=categorical_features,
+        )
+        path = Path(parquet_path).resolve()
+        if not path.exists():
+            raise FileNotFoundError(f"Parquet file not found at: {path}")
+
+        columns = preprocessor.numerical_features + preprocessor.categorical_features
+        table = pq.read_table(str(path), columns=columns)
+
+        data_dict = {col: table[col].to_numpy() for col in columns}
+        return preprocessor.fit(data_dict)
 
     def transform(self, data_dict: Dict[str, np.ndarray]) -> np.ndarray:
         """Transform tabular features into a standardized, one-hot encoded float32 matrix."""

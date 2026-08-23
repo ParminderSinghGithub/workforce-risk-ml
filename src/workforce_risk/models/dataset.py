@@ -49,11 +49,11 @@ class StructuredDataset(Dataset):
                 f"LEAKAGE VIOLATION: Forbidden columns present in feature list: {forbidden_in_features}"
             )
 
-        # 2. Read only requested raw feature columns and target from Parquet
+        # 2. Read requested raw feature columns and target from Parquet
         required_columns = self.raw_feature_names + [self.target_name]
         table = pq.read_table(str(self.parquet_path), columns=required_columns)
 
-        # 3. Deterministic subsampling if bounded sample requested (e.g. smoke test)
+        # 3. Deterministic subsampling if bounded sample requested (e.g. 100k training sample or smoke test)
         total_rows = table.num_rows
         if max_samples is not None and max_samples < total_rows:
             rng = np.random.RandomState(random_seed)
@@ -69,7 +69,7 @@ class StructuredDataset(Dataset):
             }
             target_array = table[self.target_name].to_numpy().astype(np.float32)
 
-        # 4. Fit or apply tabular preprocessor
+        # 4. Preprocessor attachment (or isolated fit if specifically requested)
         if fit_preprocessor:
             self.preprocessor = TabularPreprocessor(
                 numerical_features=[c for c in self.raw_feature_names if c in NUMERICAL_FEATURE_NAMES],
@@ -79,14 +79,9 @@ class StructuredDataset(Dataset):
         elif preprocessor is not None:
             self.preprocessor = preprocessor
         else:
-            # Standalone unscaled fallback (e.g. if explicitly passed pre-fitted)
-            self.preprocessor = TabularPreprocessor(
-                numerical_features=[c for c in self.raw_feature_names if c in NUMERICAL_FEATURE_NAMES],
-                categorical_features=[c for c in self.raw_feature_names if c in CATEGORICAL_FEATURE_NAMES],
-            )
-            self.preprocessor.fit(raw_data_dict)
+            raise ValueError("A fitted TabularPreprocessor must be provided to StructuredDataset.")
 
-        # 5. Transform raw features to float32 tensor
+        # 5. Transform raw features using the frozen preprocessor
         features_matrix = self.preprocessor.transform(raw_data_dict)
         self.features = torch.from_numpy(features_matrix).float()
         self.targets = torch.from_numpy(target_array).float().unsqueeze(1)  # [N, 1]
@@ -119,19 +114,38 @@ def create_data_loaders(
     max_train_samples: Optional[int] = None,
     max_val_samples: Optional[int] = None,
     max_test_samples: Optional[int] = None,
+    fit_on_full_train: bool = True,
+    preprocessor: Optional[TabularPreprocessor] = None,
     random_seed: int = 42,
 ) -> Tuple[DataLoader, DataLoader, DataLoader, TabularPreprocessor]:
-    """Create train, validation, and test PyTorch DataLoaders with train-fitted preprocessing."""
-    # 1. Fit preprocessor strictly on training split
+    """Create train, validation, and test PyTorch DataLoaders.
+
+    Contract:
+    1. Fits TabularPreprocessor on the COMPLETE training partition (e.g. all 680k records).
+    2. Applies deterministic sampling (e.g. 100k or smoke limit) AFTER preprocessor fitting.
+    3. Transforms sampled train, validation, and test partitions using that SAME frozen preprocessor.
+    """
+    # 1. Fit preprocessor on full training partition unless pre-fitted preprocessor is passed
+    if preprocessor is None:
+        if fit_on_full_train:
+            preprocessor = TabularPreprocessor.fit_from_parquet(train_path)
+        else:
+            # Fallback for small unit tests on partial dictionaries
+            temp_ds = StructuredDataset(
+                parquet_path=train_path,
+                fit_preprocessor=True,
+                max_samples=max_train_samples,
+                random_seed=random_seed,
+            )
+            preprocessor = temp_ds.preprocessor
+
+    # 2. Build datasets using the frozen preprocessor
     train_dataset = StructuredDataset(
         parquet_path=train_path,
-        fit_preprocessor=True,
+        preprocessor=preprocessor,
         max_samples=max_train_samples,
         random_seed=random_seed,
     )
-    preprocessor = train_dataset.preprocessor
-
-    # 2. Apply fitted preprocessor to validation and test splits (zero data leakage)
     val_dataset = StructuredDataset(
         parquet_path=val_path,
         preprocessor=preprocessor,

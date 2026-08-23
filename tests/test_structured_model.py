@@ -30,7 +30,7 @@ def _create_synthetic_parquet(file_path: Path, num_rows: int = 50, scale_salary:
         if f == "salary":
             data[f] = [float(50000.0 + (i * scale_salary / num_rows)) for i in range(num_rows)]
         elif f in CATEGORICAL_FEATURE_NAMES:
-            data[f] = [float(i % 4) for i in range(num_rows)]
+            data[f] = [float(i % 5) for i in range(num_rows)]
         else:
             data[f] = [float((i * 0.1) % 1.0) for i in range(num_rows)]
 
@@ -49,7 +49,6 @@ def test_tabular_preprocessor_fit_and_transform_isolation():
         "communication_patterns_idx": np.array([1, 2, 3]),
         "persona_name_idx": np.array([0, 1, 2]),
     }
-    # Add dummy arrays for any other required numerical features
     for num_col in NUMERICAL_FEATURE_NAMES:
         if num_col not in train_data:
             train_data[num_col] = np.array([0.1, 0.2, 0.3])
@@ -83,6 +82,38 @@ def test_tabular_preprocessor_fit_and_transform_isolation():
     assert np.isclose(transformed[0, salary_idx], 0.0, atol=1e-5)
 
 
+def test_production_path_fits_preprocessor_on_full_train_before_sampling(tmp_path: Path):
+    """Verify that create_data_loaders fits preprocessor on the complete training parquet before subsampling."""
+    train_parquet = tmp_path / "full_train.parquet"
+    val_parquet = tmp_path / "val.parquet"
+    test_parquet = tmp_path / "test.parquet"
+
+    # 100 rows in full training set, but sampling only 20
+    _create_synthetic_parquet(train_parquet, num_rows=100)
+    _create_synthetic_parquet(val_parquet, num_rows=20)
+    _create_synthetic_parquet(test_parquet, num_rows=20)
+
+    train_loader, val_loader, test_loader, preprocessor = create_data_loaders(
+        train_path=train_parquet,
+        val_path=val_parquet,
+        test_path=test_parquet,
+        batch_size=10,
+        max_train_samples=20,
+        fit_on_full_train=True,
+    )
+
+    # Preprocessor must have been fitted on all 100 rows
+    full_table = pq.read_table(str(train_parquet))
+    full_salary_mean = np.mean(full_table["salary"].to_numpy().astype(np.float32))
+    salary_idx = preprocessor.numerical_features.index("salary")
+
+    assert np.isclose(preprocessor.means[salary_idx], full_salary_mean, atol=1e-3)
+    # Loader itself only yields sampled 20 rows
+    assert len(train_loader.dataset) == 20
+    assert len(val_loader.dataset) == 20
+    assert len(test_loader.dataset) == 20
+
+
 def test_structured_dataset_loading_and_leakage_exclusion(tmp_path: Path):
     """Verify Dataset loads preprocessed features as float32 and strictly rejects leakage columns."""
     parquet_file = tmp_path / "synthetic_train.parquet"
@@ -90,7 +121,7 @@ def test_structured_dataset_loading_and_leakage_exclusion(tmp_path: Path):
 
     dataset = StructuredDataset(parquet_file, fit_preprocessor=True)
     assert len(dataset) == 40
-    assert dataset.input_dim >= 29  # 24 continuous + one-hot categories
+    assert dataset.input_dim >= 29
 
     x, y = dataset[0]
     assert x.shape == (dataset.input_dim,)
@@ -99,7 +130,6 @@ def test_structured_dataset_loading_and_leakage_exclusion(tmp_path: Path):
     assert y.dtype == torch.float32
     assert torch.isfinite(x).all()
 
-    # Leakage exclusion assertion: passing forbidden column raises ValueError
     with pytest.raises(ValueError, match="LEAKAGE VIOLATION"):
         StructuredDataset(parquet_file, feature_names=["burnout_risk", "salary"])
 
@@ -117,7 +147,6 @@ def test_structured_dataset_deterministic_sampling(tmp_path: Path):
     assert len(ds2) == 25
     assert len(ds3) == 25
 
-    # ds1 and ds2 must be identical
     assert torch.equal(ds1.features, ds2.features)
     assert torch.equal(ds1.targets, ds2.targets)
 
@@ -132,7 +161,6 @@ def test_structured_mlp_architecture():
     logits = model(batch_x)
     assert logits.shape == (16, 1)
 
-    # Predict proba applies sigmoid
     probs = model.predict_proba(batch_x)
     assert probs.shape == (16, 1)
     assert (probs >= 0.0).all() and (probs <= 1.0).all()
