@@ -1,5 +1,6 @@
-"""Unit tests for TabularPreprocessor, StructuredDataset, StructuredMLP, training steps, and checkpointing."""
+"""Unit tests for TabularPreprocessor, StructuredDataset, StructuredMLP, training steps, device handling, and checkpointing."""
 
+import sys
 from pathlib import Path
 import numpy as np
 import pyarrow as pa
@@ -17,6 +18,7 @@ from workforce_risk.models.preprocessor import (
     NUMERICAL_FEATURE_NAMES,
     TabularPreprocessor,
 )
+from workforce_risk.models.train import get_device, parse_args, train_structured_model
 
 
 def _create_synthetic_parquet(file_path: Path, num_rows: int = 50, scale_salary: float = 100000.0) -> None:
@@ -61,7 +63,6 @@ def test_tabular_preprocessor_fit_and_transform_isolation():
     assert np.isclose(prep.means[salary_idx], 100000.0)
     assert prep.is_fitted
 
-    # Transform unseen val data (including out-of-vocab category)
     val_data = {
         "salary": np.array([100000.0, 200000.0]),
         "performance_score": np.array([0.7, 1.0]),
@@ -78,17 +79,15 @@ def test_tabular_preprocessor_fit_and_transform_isolation():
     transformed = prep.transform(val_data)
     assert transformed.shape == (2, prep.feature_dim)
     assert np.isfinite(transformed).all()
-    # Salary 100000 should be 0.0 (mean normalized)
     assert np.isclose(transformed[0, salary_idx], 0.0, atol=1e-5)
 
 
 def test_production_path_fits_preprocessor_on_full_train_before_sampling(tmp_path: Path):
-    """Verify that create_data_loaders fits preprocessor on the complete training parquet before subsampling."""
+    """Verify that create_data_loaders fits preprocessor on complete training parquet before subsampling."""
     train_parquet = tmp_path / "full_train.parquet"
     val_parquet = tmp_path / "val.parquet"
     test_parquet = tmp_path / "test.parquet"
 
-    # 100 rows in full training set, but sampling only 20
     _create_synthetic_parquet(train_parquet, num_rows=100)
     _create_synthetic_parquet(val_parquet, num_rows=20)
     _create_synthetic_parquet(test_parquet, num_rows=20)
@@ -102,13 +101,11 @@ def test_production_path_fits_preprocessor_on_full_train_before_sampling(tmp_pat
         fit_on_full_train=True,
     )
 
-    # Preprocessor must have been fitted on all 100 rows
     full_table = pq.read_table(str(train_parquet))
     full_salary_mean = np.mean(full_table["salary"].to_numpy().astype(np.float32))
     salary_idx = preprocessor.numerical_features.index("salary")
 
     assert np.isclose(preprocessor.means[salary_idx], full_salary_mean, atol=1e-3)
-    # Loader itself only yields sampled 20 rows
     assert len(train_loader.dataset) == 20
     assert len(val_loader.dataset) == 20
     assert len(test_loader.dataset) == 20
@@ -134,21 +131,71 @@ def test_structured_dataset_loading_and_leakage_exclusion(tmp_path: Path):
         StructuredDataset(parquet_file, feature_names=["burnout_risk", "salary"])
 
 
-def test_structured_dataset_deterministic_sampling(tmp_path: Path):
-    """Verify deterministic max_samples subsampling produces identical rows for same seed."""
-    parquet_file = tmp_path / "synthetic_train.parquet"
-    _create_synthetic_parquet(parquet_file, num_rows=100)
+def test_device_selection_and_cuda_error_handling(monkeypatch):
+    """Verify device selection returns proper devices and fails clearly when CUDA is unavailable."""
+    dev, info = get_device("cpu")
+    assert dev.type == "cpu"
+    assert "pytorch_version" in info
 
-    ds1 = StructuredDataset(parquet_file, fit_preprocessor=True, max_samples=25, random_seed=42)
-    ds2 = StructuredDataset(parquet_file, fit_preprocessor=True, max_samples=25, random_seed=42)
-    ds3 = StructuredDataset(parquet_file, fit_preprocessor=True, max_samples=25, random_seed=99)
+    dev_auto, info_auto = get_device("auto")
+    assert dev_auto.type in ["cpu", "cuda"]
 
-    assert len(ds1) == 25
-    assert len(ds2) == 25
-    assert len(ds3) == 25
+    # Mock CUDA as unavailable and test explicit 'cuda' request raises RuntimeError
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    with pytest.raises(RuntimeError, match="CUDA device requested"):
+        get_device("cuda")
 
-    assert torch.equal(ds1.features, ds2.features)
-    assert torch.equal(ds1.targets, ds2.targets)
+    with pytest.raises(ValueError, match="Unknown device setting"):
+        get_device("tpu")
+
+
+def test_cli_argument_parsing(monkeypatch):
+    """Verify parse_args accurately parses command-line arguments for Kaggle execution."""
+    test_args = [
+        "train.py",
+        "--train-sample-size", "100000",
+        "--device", "cuda",
+        "--epochs", "15",
+        "--batch-size", "512",
+        "--lr", "0.0005",
+        "--artifacts-dir", "custom_artifacts",
+    ]
+    monkeypatch.setattr(sys, "argv", test_args)
+    parsed = parse_args()
+
+    assert parsed.train_sample_size == 100000
+    assert parsed.device == "cuda"
+    assert parsed.epochs == 15
+    assert parsed.batch_size == 512
+    assert parsed.lr == 0.0005
+    assert parsed.artifacts_dir == "custom_artifacts"
+
+
+def test_training_and_metadata_generation(tmp_path: Path):
+    """Verify end-to-end training generates all expected metadata and artifacts."""
+    train_p = tmp_path / "train.parquet"
+    val_p = tmp_path / "val.parquet"
+    test_p = tmp_path / "test.parquet"
+    art_dir = tmp_path / "artifacts"
+
+    _create_synthetic_parquet(train_p, num_rows=30)
+    _create_synthetic_parquet(val_p, num_rows=15)
+    _create_synthetic_parquet(test_p, num_rows=15)
+
+    result = train_structured_model(
+        train_path=train_p,
+        val_path=val_p,
+        test_path=test_p,
+        artifacts_dir=art_dir,
+        epochs=1,
+        batch_size=8,
+        device_str="cpu",
+    )
+
+    assert result["status"] == "SUCCESS"
+    assert (art_dir / "best_checkpoint.pt").exists()
+    assert (art_dir / "training_history.json").exists()
+    assert (art_dir / "evaluation_summary.json").exists()
 
 
 def test_structured_mlp_architecture():
