@@ -20,7 +20,8 @@ data/splits/*
 !*.jsonl
 
 # Model Artifacts, Checkpoints & Weights
-models/
+artifacts/
+/models/
 checkpoints/
 *.pt
 *.pth
