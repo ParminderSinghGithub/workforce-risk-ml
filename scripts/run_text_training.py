@@ -15,21 +15,34 @@ if str(PROJECT_ROOT) not in sys.path:
 from workforce_risk.nlp.train import parse_args, train_text_transformer
 
 
-def resolve_split_paths(args_train: str | None, args_val: str | None, args_test: str | None) -> tuple[Path | None, Path | None, Path | None]:
+def resolve_split_paths(
+    args_train: str | None,
+    args_val: str | None,
+    args_test: str | None,
+) -> tuple[Path | None, Path | None, Path | None]:
     """Auto-detect Kaggle input dataset mount path or fallback to local splits."""
-    kaggle_dir = Path("/kaggle/input/workforce-risk-structured-data")
-    if args_train is None and (kaggle_dir / "text_train.parquet").exists():
-        print(f"[Runner] Detected Kaggle dataset mount at {kaggle_dir}")
+    if args_train is not None:
         return (
-            kaggle_dir / "text_train.parquet",
-            kaggle_dir / "text_validation.parquet",
-            kaggle_dir / "text_test.parquet",
+            Path(args_train),
+            Path(args_val) if args_val else None,
+            Path(args_test) if args_test else None,
         )
-    return (
-        Path(args_train) if args_train else None,
-        Path(args_val) if args_val else None,
-        Path(args_test) if args_test else None,
-    )
+
+    # Check candidates for Kaggle dataset mounts
+    candidates = [
+        Path("/kaggle/input/workforce-risk-text-data"),
+        Path("/kaggle/input/workforce-risk-structured-data"),
+    ]
+    for candidate in candidates:
+        if (candidate / "text_train.parquet").exists():
+            print(f"[Runner] Auto-detected Kaggle dataset mount at: {candidate}")
+            return (
+                candidate / "text_train.parquet",
+                candidate / "text_validation.parquet",
+                candidate / "text_test.parquet",
+            )
+
+    return None, None, None
 
 
 def main() -> None:
