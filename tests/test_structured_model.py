@@ -11,7 +11,12 @@ import torch.nn as nn
 
 from workforce_risk.features.definitions import FEATURE_DEFINITIONS
 from workforce_risk.models.dataset import StructuredDataset, create_data_loaders
-from workforce_risk.models.evaluate import calculate_classification_metrics, evaluate_model
+from workforce_risk.models.evaluate import (
+    calculate_classification_metrics,
+    evaluate_model,
+    evaluate_threshold_sweep,
+    find_optimal_threshold,
+)
 from workforce_risk.models.model import StructuredMLP
 from workforce_risk.models.preprocessor import (
     CATEGORICAL_FEATURE_NAMES,
@@ -287,3 +292,32 @@ def test_checkpoint_save_and_reload_identity(tmp_path: Path):
         reloaded_output = reloaded_model(test_input)
 
     assert torch.allclose(original_output, reloaded_output, atol=1e-6)
+
+
+def test_evaluate_threshold_sweep():
+    """Verify threshold sweep calculates precision, recall, F1 across requested threshold grid."""
+    y_true = np.array([1, 0, 1, 0, 1, 1, 0, 0])
+    y_prob = np.array([0.8, 0.2, 0.6, 0.3, 0.7, 0.4, 0.1, 0.2])
+
+    sweep = evaluate_threshold_sweep(y_true, y_prob, thresholds=[0.25, 0.50, 0.75])
+    assert len(sweep) == 3
+    assert sweep[0]["threshold"] == 0.25
+    assert sweep[1]["threshold"] == 0.50
+    assert sweep[2]["threshold"] == 0.75
+
+    # At 0.50: predictions >= 0.5 are indices 0, 2, 4 (all 1s in y_true, total 3) -> Precision 1.0, Recall 0.75
+    assert sweep[1]["precision"] == 1.0
+    assert sweep[1]["recall"] == 0.75
+    assert sweep[1]["pred_count"] == 3
+
+
+def test_find_optimal_threshold():
+    """Verify optimal threshold search finds threshold maximizing target metric."""
+    y_true = np.array([1, 0, 1, 0, 1, 1, 0, 0])
+    y_prob = np.array([0.45, 0.10, 0.40, 0.15, 0.35, 0.30, 0.05, 0.10])
+
+    best_thresh, best_f1 = find_optimal_threshold(y_true, y_prob, metric="f1", num_thresholds=50)
+    assert 0.15 <= best_thresh <= 0.30
+    assert best_f1 == 1.0
+
+

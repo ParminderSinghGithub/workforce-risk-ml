@@ -1,7 +1,12 @@
 """PyTorch structured modeling package for employee attrition prediction."""
 
 from workforce_risk.models.dataset import StructuredDataset, create_data_loaders
-from workforce_risk.models.evaluate import calculate_classification_metrics, evaluate_model
+from workforce_risk.models.evaluate import (
+    calculate_classification_metrics,
+    evaluate_model,
+    evaluate_threshold_sweep,
+    find_optimal_threshold,
+)
 from workforce_risk.models.model import StructuredMLP
 from workforce_risk.models.preprocessor import (
     CATEGORICAL_FEATURE_NAMES,
@@ -16,6 +21,8 @@ __all__ = [
     "StructuredMLP",
     "calculate_classification_metrics",
     "evaluate_model",
+    "evaluate_threshold_sweep",
+    "find_optimal_threshold",
     "get_device",
     "train_structured_model",
     "TabularPreprocessor",

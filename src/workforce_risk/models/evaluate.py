@@ -1,6 +1,6 @@
-"""Evaluation metrics and evaluation loop for structured classification models."""
+"""Evaluation metrics, threshold sweeps, and evaluation loop for structured classification models."""
 
-from typing import Dict, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 from sklearn.metrics import (
     average_precision_score,
@@ -62,7 +62,98 @@ def calculate_classification_metrics(
         "recall": round(rec, 4),
         "f1": round(f1, 4),
         "loss": round(bce_loss, 4),
+        "threshold": round(threshold, 4),
     }
+
+
+def evaluate_threshold_sweep(
+    y_true: np.ndarray,
+    y_prob: np.ndarray,
+    thresholds: Optional[List[float] | np.ndarray] = None,
+) -> List[Dict[str, Any]]:
+    """Evaluate precision, recall, F1, and predicted positive counts across a threshold grid.
+
+    Args:
+        y_true: Ground truth binary array.
+        y_prob: Continuous predicted probabilities in [0, 1].
+        thresholds: List or array of probability thresholds (default: 0.10 to 0.90 in steps of 0.01).
+
+    Returns:
+        List of metric dictionaries for each threshold.
+    """
+    y_true = np.asarray(y_true).ravel()
+    y_prob = np.asarray(y_prob).ravel()
+
+    if thresholds is None:
+        thresholds = np.linspace(0.10, 0.90, 81)
+
+    results: List[Dict[str, Any]] = []
+    for t in thresholds:
+        t_val = float(t)
+        y_pred = (y_prob >= t_val).astype(int)
+        prec = float(precision_score(y_true, y_pred, zero_division=0))
+        rec = float(recall_score(y_true, y_pred, zero_division=0))
+        f1 = float(f1_score(y_true, y_pred, zero_division=0))
+        pos_pct = float(y_pred.mean() * 100)
+
+        results.append({
+            "threshold": round(t_val, 4),
+            "precision": round(prec, 4),
+            "recall": round(rec, 4),
+            "f1": round(f1, 4),
+            "pred_pos_pct": round(pos_pct, 2),
+            "pred_count": int(y_pred.sum()),
+        })
+
+    return results
+
+
+def find_optimal_threshold(
+    y_true: np.ndarray,
+    y_prob: np.ndarray,
+    metric: str = "f1",
+    num_thresholds: int = 100,
+) -> Tuple[float, float]:
+    """Find decision threshold that optimizes target metric (e.g. F1) on validation data.
+
+    Args:
+        y_true: Ground truth binary target array.
+        y_prob: Predicted probability array.
+        metric: Optimization criterion ('f1', 'precision', 'recall').
+        num_thresholds: Granularity of threshold search grid.
+
+    Returns:
+        Tuple of (optimal_threshold, best_metric_score).
+    """
+    y_true = np.asarray(y_true).ravel()
+    y_prob = np.asarray(y_prob).ravel()
+
+    p_min = max(0.001, float(y_prob.min()))
+    p_max = min(0.999, float(y_prob.max()))
+    if p_min >= p_max:
+        return 0.5, 0.0
+
+    thresholds = np.linspace(p_min, p_max, num_thresholds)
+    best_threshold = 0.5
+    best_score = -1.0
+
+    for t in thresholds:
+        t_val = float(t)
+        y_pred = (y_prob >= t_val).astype(int)
+        if metric == "f1":
+            score = float(f1_score(y_true, y_pred, zero_division=0))
+        elif metric == "precision":
+            score = float(precision_score(y_true, y_pred, zero_division=0))
+        elif metric == "recall":
+            score = float(recall_score(y_true, y_pred, zero_division=0))
+        else:
+            raise ValueError(f"Unsupported metric '{metric}' for threshold optimization.")
+
+        if score > best_score:
+            best_score = score
+            best_threshold = t_val
+
+    return round(best_threshold, 4), round(best_score, 4)
 
 
 def evaluate_model(
