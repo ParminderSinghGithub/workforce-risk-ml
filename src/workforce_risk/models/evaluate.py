@@ -19,7 +19,7 @@ def calculate_classification_metrics(
     y_true: np.ndarray,
     y_prob: np.ndarray,
     threshold: float = 0.5,
-) -> Dict[str, float]:
+) -> Dict[str, Any]:
     """Calculate quantitative classification performance metrics.
 
     Args:
@@ -28,7 +28,8 @@ def calculate_classification_metrics(
         threshold: Decision threshold for discrete classification (default: 0.5).
 
     Returns:
-        Dictionary containing ROC-AUC, PR-AUC, Precision, Recall, F1, and Log-Loss.
+        Dictionary containing ROC-AUC, PR-AUC, Precision, Recall, F1, Log-Loss,
+        Brier Score, and Confusion Matrix components.
     """
     y_true = np.asarray(y_true).ravel()
     y_prob = np.asarray(y_prob).ravel()
@@ -55,6 +56,14 @@ def calculate_classification_metrics(
     except Exception:
         bce_loss = 0.0
 
+    brier = float(np.mean((y_prob - y_true) ** 2))
+
+    # Confusion matrix components
+    tn = int(((y_true == 0) & (y_pred == 0)).sum())
+    fp = int(((y_true == 0) & (y_pred == 1)).sum())
+    fn = int(((y_true == 1) & (y_pred == 0)).sum())
+    tp = int(((y_true == 1) & (y_pred == 1)).sum())
+
     return {
         "roc_auc": round(roc_auc, 4),
         "pr_auc": round(pr_auc, 4),
@@ -62,7 +71,15 @@ def calculate_classification_metrics(
         "recall": round(rec, 4),
         "f1": round(f1, 4),
         "loss": round(bce_loss, 4),
+        "brier_score": round(brier, 4),
         "threshold": round(threshold, 4),
+        "confusion_matrix": {
+            "true_negatives": tn,
+            "false_positives": fp,
+            "false_negatives": fn,
+            "true_positives": tp,
+        },
+        "predicted_positive_rate": round(float(y_pred.mean() * 100), 2),
     }
 
 
@@ -162,7 +179,7 @@ def evaluate_model(
     criterion: nn.Module,
     device: torch.device,
     threshold: float = 0.5,
-) -> Tuple[float, Dict[str, float], np.ndarray, np.ndarray]:
+) -> Tuple[float, Dict[str, Any], np.ndarray, np.ndarray]:
     """Execute evaluation loop over DataLoader and calculate comprehensive metrics.
 
     Args:

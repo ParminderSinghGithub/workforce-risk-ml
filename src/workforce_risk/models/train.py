@@ -16,7 +16,11 @@ from torch.optim import AdamW
 from workforce_risk.config import get_config
 from workforce_risk.features.definitions import FEATURE_DEFINITIONS
 from workforce_risk.models.dataset import create_data_loaders
-from workforce_risk.models.evaluate import evaluate_model
+from workforce_risk.models.evaluate import (
+    evaluate_model,
+    evaluate_threshold_sweep,
+    find_optimal_threshold,
+)
 from workforce_risk.models.model import StructuredMLP
 from workforce_risk.models.preprocessor import TabularPreprocessor
 from workforce_risk.utils.seed import set_seed
@@ -131,6 +135,7 @@ def train_structured_model(
     checkpoint_path = artifacts_dir / "best_checkpoint.pt"
     history_path = artifacts_dir / "training_history.json"
     evaluation_summary_path = artifacts_dir / "evaluation_summary.json"
+    run_summary_path = artifacts_dir / "run_summary.md"
 
     # 2. Select compute device and display environment banner
     device, device_info = get_device(device_str)
@@ -270,7 +275,7 @@ def train_structured_model(
                 print(f"[Training] Early stopping triggered at epoch {epoch} (no improvement for {patience} consecutive epochs).")
                 break
 
-    # 6. Reload best checkpoint from disk and evaluate on holdout test set
+    # 6. Reload best checkpoint from disk
     print(f"[Training] Reloading best checkpoint from epoch {best_epoch} ({checkpoint_path})...")
     saved_ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
 
@@ -282,24 +287,44 @@ def train_structured_model(
     best_model.load_state_dict(saved_ckpt["model_state_dict"])
     best_model.eval()
 
-    # Re-evaluate reloaded model on validation set to verify consistency
-    _, reloaded_val_metrics, _, _ = evaluate_model(
+    # Re-evaluate reloaded model on validation set and determine optimal threshold
+    _, val_metrics_default, val_targets, val_probs = evaluate_model(
         model=best_model,
         data_loader=val_loader,
         criterion=criterion,
         device=device,
+        threshold=0.5,
     )
+    best_val_thresh, best_val_f1 = find_optimal_threshold(val_targets, val_probs, metric="f1")
+    _, val_metrics_optimal, _, _ = evaluate_model(
+        model=best_model,
+        data_loader=val_loader,
+        criterion=criterion,
+        device=device,
+        threshold=best_val_thresh,
+    )
+    val_threshold_sweep = evaluate_threshold_sweep(val_targets, val_probs)
 
-    # Evaluate on final test set (strictly untouched during training decisions)
-    test_loss, test_metrics, _, _ = evaluate_model(
+    # Evaluate on final test set at default (0.50) AND validation-selected optimal threshold
+    test_loss_default, test_metrics_default, test_targets, test_probs = evaluate_model(
         model=best_model,
         data_loader=test_loader,
         criterion=criterion,
         device=device,
+        threshold=0.5,
+    )
+    _, test_metrics_optimal, _, _ = evaluate_model(
+        model=best_model,
+        data_loader=test_loader,
+        criterion=criterion,
+        device=device,
+        threshold=best_val_thresh,
     )
 
     print("-" * 72)
-    print(f"[Test Evaluation] Test Loss: {test_loss:.4f} | Test ROC-AUC: {test_metrics['roc_auc']:.4f} | Test PR-AUC: {test_metrics['pr_auc']:.4f} | Test F1: {test_metrics['f1']:.4f}")
+    print(f"[Validation Optimal] Threshold: {best_val_thresh:.4f} | Optimal Val F1: {best_val_f1:.4f}")
+    print(f"[Test Evaluation]   ROC-AUC: {test_metrics_default['roc_auc']:.4f} | PR-AUC: {test_metrics_default['pr_auc']:.4f}")
+    print(f"[Test Evaluation]   Default F1 (t=0.50): {test_metrics_default['f1']:.4f} | Optimal F1 (t={best_val_thresh:.2f}): {test_metrics_optimal['f1']:.4f}")
     print("-" * 72)
 
     total_time = round(time.time() - t0, 2)
@@ -331,12 +356,20 @@ def train_structured_model(
             "early_stopping_patience": patience,
             "seed": seed,
         },
+        "threshold_tuning": {
+            "selected_on_split": "validation",
+            "optimal_threshold": best_val_thresh,
+            "optimal_val_f1": best_val_f1,
+            "validation_threshold_sweep": val_threshold_sweep,
+        },
         "training_results": {
             "total_training_seconds": total_time,
             "best_epoch": best_epoch,
             "best_val_roc_auc": best_val_roc_auc,
-            "best_val_metrics": reloaded_val_metrics,
-            "test_metrics": test_metrics,
+            "val_metrics_default_0_5": val_metrics_default,
+            "val_metrics_optimal": val_metrics_optimal,
+            "test_metrics_default_0_5": test_metrics_default,
+            "test_metrics_at_val_optimal": test_metrics_optimal,
         },
         "epochs_history": history,
     }
@@ -351,21 +384,61 @@ def train_structured_model(
         "train_rows": actual_train_rows,
         "best_epoch": best_epoch,
         "val_roc_auc": best_val_roc_auc,
-        "val_pr_auc": reloaded_val_metrics["pr_auc"],
-        "val_f1": reloaded_val_metrics["f1"],
-        "test_roc_auc": test_metrics["roc_auc"],
-        "test_pr_auc": test_metrics["pr_auc"],
-        "test_f1": test_metrics["f1"],
-        "test_loss": test_metrics["loss"],
+        "val_pr_auc": val_metrics_default["pr_auc"],
+        "optimal_val_threshold": best_val_thresh,
+        "val_f1_optimal": val_metrics_optimal["f1"],
+        "test_roc_auc": test_metrics_default["roc_auc"],
+        "test_pr_auc": test_metrics_default["pr_auc"],
+        "test_f1_default": test_metrics_default["f1"],
+        "test_f1_optimal": test_metrics_optimal["f1"],
+        "test_loss": test_metrics_default["loss"],
+        "test_confusion_matrix_optimal": test_metrics_optimal["confusion_matrix"],
         "checkpoint_path": str(checkpoint_path),
         "total_seconds": total_time,
     }
     with open(evaluation_summary_path, "w", encoding="utf-8") as f:
         json.dump(summary_data, f, indent=2)
 
-    print(f"[Artifacts] Checkpoint saved: {checkpoint_path} ({checkpoint_path.stat().st_size:,} bytes)")
-    print(f"[Artifacts] Training history: {history_path}")
-    print(f"[Artifacts] Evaluation summary: {evaluation_summary_path}")
+    # Generate human-readable Markdown summary report
+    md_content = f"""# Structured MLP Training Run Summary
+
+- **Timestamp (UTC)**: `{timestamp_utc}`
+- **Git Commit**: `{git_hash}`
+- **Device**: `{device_info['selected_device']}`
+- **Training Samples**: `{actual_train_rows:,}`
+- **Total Training Time**: `{total_time}s`
+
+## Model Architecture & Hyperparameters
+- **Input Dimension**: `{input_dim}` (24 continuous + {input_dim - 24} one-hot encoded)
+- **Hidden Layers**: `{hidden_dims}`
+- **Dropout**: `{dropout}`
+- **Total Parameters**: `{model.total_parameters:,}`
+- **Batch Size**: `{batch_size}` | **Learning Rate**: `{learning_rate}` | **Patience**: `{patience}`
+
+## Quantitative Evaluation Metrics
+
+| Metric | Validation (Default t=0.50) | Validation (Optimal t={best_val_thresh:.2f}) | Holdout Test (Default t=0.50) | Holdout Test (Optimal t={best_val_thresh:.2f}) |
+| :--- | :---: | :---: | :---: | :---: |
+| **ROC-AUC** | `{val_metrics_default['roc_auc']:.4f}` | `{val_metrics_default['roc_auc']:.4f}` | `{test_metrics_default['roc_auc']:.4f}` | `{test_metrics_default['roc_auc']:.4f}` |
+| **PR-AUC** | `{val_metrics_default['pr_auc']:.4f}` | `{val_metrics_default['pr_auc']:.4f}` | `{test_metrics_default['pr_auc']:.4f}` | `{test_metrics_default['pr_auc']:.4f}` |
+| **Precision** | `{val_metrics_default['precision']:.4f}` | `{val_metrics_optimal['precision']:.4f}` | `{test_metrics_default['precision']:.4f}` | `{test_metrics_optimal['precision']:.4f}` |
+| **Recall** | `{val_metrics_default['recall']:.4f}` | `{val_metrics_optimal['recall']:.4f}` | `{test_metrics_default['recall']:.4f}` | `{test_metrics_optimal['recall']:.4f}` |
+| **F1 Score** | `{val_metrics_default['f1']:.4f}` | **`{val_metrics_optimal['f1']:.4f}`** | `{test_metrics_default['f1']:.4f}` | **`{test_metrics_optimal['f1']:.4f}`** |
+| **Log-Loss** | `{val_metrics_default['loss']:.4f}` | `{val_metrics_optimal['loss']:.4f}` | `{test_metrics_default['loss']:.4f}` | `{test_metrics_optimal['loss']:.4f}` |
+
+## Test Confusion Matrix (at Val-Optimal Threshold $\\tau = {best_val_thresh:.2f}$)
+- **True Negatives**: `{test_metrics_optimal['confusion_matrix']['true_negatives']:,}`
+- **False Positives**: `{test_metrics_optimal['confusion_matrix']['false_positives']:,}`
+- **False Negatives**: `{test_metrics_optimal['confusion_matrix']['false_negatives']:,}`
+- **True Positives**: `{test_metrics_optimal['confusion_matrix']['true_positives']:,}`
+"""
+    with open(run_summary_path, "w", encoding="utf-8") as f:
+        f.write(md_content)
+
+    print(f"[Artifacts] Checkpoint saved:       {checkpoint_path} ({checkpoint_path.stat().st_size:,} bytes)")
+    print(f"[Artifacts] Training history:       {history_path}")
+    print(f"[Artifacts] Evaluation summary:     {evaluation_summary_path}")
+    print(f"[Artifacts] Run summary (Markdown): {run_summary_path}")
 
     return {
         "status": "SUCCESS",
@@ -374,12 +447,14 @@ def train_structured_model(
         "input_dim": input_dim,
         "best_epoch": best_epoch,
         "best_val_roc_auc": best_val_roc_auc,
-        "reloaded_val_metrics": reloaded_val_metrics,
-        "test_metrics": test_metrics,
+        "optimal_val_threshold": best_val_thresh,
+        "val_metrics_optimal": val_metrics_optimal,
+        "test_metrics_optimal": test_metrics_optimal,
         "checkpoint_path": str(checkpoint_path),
         "checkpoint_size_bytes": checkpoint_path.stat().st_size,
         "training_history_path": str(history_path),
         "evaluation_summary_path": str(evaluation_summary_path),
+        "run_summary_path": str(run_summary_path),
         "elapsed_seconds": total_time,
     }
 

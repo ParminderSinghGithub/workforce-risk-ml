@@ -11,8 +11,11 @@ import torch.nn as nn
 from torch.optim import AdamW
 
 from workforce_risk.config import get_config
-from workforce_risk.models.evaluate import find_optimal_threshold
-from workforce_risk.models.train import get_device, print_startup_banner
+from workforce_risk.models.evaluate import (
+    evaluate_threshold_sweep,
+    find_optimal_threshold,
+)
+from workforce_risk.models.train import get_device, get_git_commit_hash, print_startup_banner
 from workforce_risk.nlp.dataset import create_text_data_loaders
 from workforce_risk.nlp.evaluate import evaluate_text_transformer
 from workforce_risk.nlp.model import (
@@ -49,6 +52,7 @@ def train_text_transformer(
     config = get_config()
     t0 = time.time()
     timestamp_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    git_hash = get_git_commit_hash()
 
     seed = seed if seed is not None else config.project.seed
     set_seed(seed)
@@ -67,6 +71,7 @@ def train_text_transformer(
     checkpoint_dir = artifacts_dir / "best_model"
     history_path = artifacts_dir / "training_history.json"
     summary_path = artifacts_dir / "evaluation_summary.json"
+    run_summary_path = artifacts_dir / "run_summary.md"
 
     # 1. Device selection
     device, device_info = get_device(device_str)
@@ -208,16 +213,25 @@ def train_text_transformer(
     print(f"[Training] Reloading best LoRA model from {checkpoint_dir}...")
     best_model, _ = load_lora_text_model(checkpoint_dir, device=device)
 
-    _, reloaded_val_metrics, val_targets, val_probs = evaluate_text_transformer(
+    # Re-evaluate reloaded model on validation set
+    _, val_metrics_default, val_targets, val_probs = evaluate_text_transformer(
         model=best_model,
         data_loader=val_loader,
         criterion=criterion,
         device=device,
+        threshold=0.5,
     )
-
     best_thresh, best_val_f1 = find_optimal_threshold(val_targets, val_probs, metric="f1")
+    _, val_metrics_optimal, _, _ = evaluate_text_transformer(
+        model=best_model,
+        data_loader=val_loader,
+        criterion=criterion,
+        device=device,
+        threshold=best_thresh,
+    )
+    val_threshold_sweep = evaluate_threshold_sweep(val_targets, val_probs)
 
-    # Evaluate on final holdout test set at default and optimal thresholds
+    # Evaluate on final holdout test set at default and validation-selected optimal thresholds
     test_loss_default, test_metrics_default, test_targets, test_probs = evaluate_text_transformer(
         model=best_model,
         data_loader=test_loader,
@@ -234,8 +248,9 @@ def train_text_transformer(
     )
 
     print("-" * 72)
-    print(f"[Test Evaluation] ROC-AUC: {test_metrics_default['roc_auc']:.4f} | PR-AUC: {test_metrics_default['pr_auc']:.4f}")
-    print(f"[Test Evaluation] Default F1 (t=0.50): {test_metrics_default['f1']:.4f} | Optimal F1 (t={best_thresh:.2f}): {test_metrics_optimal['f1']:.4f}")
+    print(f"[Validation Optimal] Threshold: {best_thresh:.4f} | Optimal Val F1: {best_val_f1:.4f}")
+    print(f"[Test Evaluation]   ROC-AUC: {test_metrics_default['roc_auc']:.4f} | PR-AUC: {test_metrics_default['pr_auc']:.4f}")
+    print(f"[Test Evaluation]   Default F1 (t=0.50): {test_metrics_default['f1']:.4f} | Optimal F1 (t={best_thresh:.2f}): {test_metrics_optimal['f1']:.4f}")
     print("-" * 72)
 
     total_time = round(time.time() - t0, 2)
@@ -244,6 +259,7 @@ def train_text_transformer(
     history_data = {
         "experiment": "DistilBERT_LoRA_Burnout_Risk",
         "timestamp_utc": timestamp_utc,
+        "git_commit": git_hash,
         "environment": device_info,
         "dataset_sizes": {
             "train_rows": actual_train_rows,
@@ -266,14 +282,19 @@ def train_text_transformer(
             "patience": patience,
             "seed": seed,
         },
+        "threshold_tuning": {
+            "selected_on_split": "validation",
+            "optimal_threshold": best_thresh,
+            "optimal_val_f1": best_val_f1,
+            "validation_threshold_sweep": val_threshold_sweep,
+        },
         "results": {
             "best_epoch": best_epoch,
             "best_val_roc_auc": best_val_roc_auc,
-            "optimal_val_threshold": best_thresh,
-            "optimal_val_f1": best_val_f1,
-            "val_metrics": reloaded_val_metrics,
+            "val_metrics_default_0_5": val_metrics_default,
+            "val_metrics_optimal": val_metrics_optimal,
             "test_metrics_default_0_5": test_metrics_default,
-            "test_metrics_optimal_thresh": test_metrics_optimal,
+            "test_metrics_at_val_optimal": test_metrics_optimal,
             "total_seconds": total_time,
         },
         "epochs_history": history,
@@ -284,13 +305,20 @@ def train_text_transformer(
 
     summary_data = {
         "timestamp_utc": timestamp_utc,
+        "git_commit": git_hash,
         "device": device_info["selected_device"],
         "train_rows": actual_train_rows,
         "best_epoch": best_epoch,
         "val_roc_auc": best_val_roc_auc,
+        "val_pr_auc": val_metrics_default["pr_auc"],
+        "optimal_val_threshold": best_thresh,
+        "val_f1_optimal": val_metrics_optimal["f1"],
         "test_roc_auc": test_metrics_default["roc_auc"],
         "test_pr_auc": test_metrics_default["pr_auc"],
+        "test_f1_default": test_metrics_default["f1"],
         "test_f1_optimal": test_metrics_optimal["f1"],
+        "test_loss": test_metrics_default["loss"],
+        "test_confusion_matrix_optimal": test_metrics_optimal["confusion_matrix"],
         "checkpoint_dir": str(checkpoint_dir),
         "total_seconds": total_time,
     }
@@ -298,16 +326,53 @@ def train_text_transformer(
     with open(summary_path, "w", encoding="utf-8") as f:
         json.dump(summary_data, f, indent=2)
 
-    print(f"[Artifacts] Best LoRA model saved: {checkpoint_dir}")
+    # Generate human-readable Markdown summary report
+    md_content = f"""# DistilBERT + PEFT/LoRA Text Classifier Run Summary
+
+- **Timestamp (UTC)**: `{timestamp_utc}`
+- **Git Commit**: `{git_hash}`
+- **Device**: `{device_info['selected_device']}`
+- **Training Samples**: `{actual_train_rows:,}`
+- **Total Training Time**: `{total_time}s`
+
+## Model Architecture & Hyperparameters
+- **Base Model**: `{base_model_name}`
+- **LoRA Configuration**: $r={lora_r}$, $\\alpha={lora_alpha}$, dropout=${lora_dropout}$, modules=`q_lin, v_lin`
+- **Trainable Parameters**: `{param_summary['trainable_params']:,}` / `{param_summary['all_params']:,}` (`{param_summary['trainable_percent']}%`)
+- **Batch Size**: `{batch_size}` | **Learning Rate**: `{learning_rate}` | **Max Length**: `{max_length}`
+
+## Quantitative Evaluation Metrics
+
+| Metric | Validation (Default t=0.50) | Validation (Optimal t={best_thresh:.2f}) | Holdout Test (Default t=0.50) | Holdout Test (Optimal t={best_thresh:.2f}) |
+| :--- | :---: | :---: | :---: | :---: |
+| **ROC-AUC** | `{val_metrics_default['roc_auc']:.4f}` | `{val_metrics_default['roc_auc']:.4f}` | `{test_metrics_default['roc_auc']:.4f}` | `{test_metrics_default['roc_auc']:.4f}` |
+| **PR-AUC** | `{val_metrics_default['pr_auc']:.4f}` | `{val_metrics_default['pr_auc']:.4f}` | `{test_metrics_default['pr_auc']:.4f}` | `{test_metrics_default['pr_auc']:.4f}` |
+| **Precision** | `{val_metrics_default['precision']:.4f}` | `{val_metrics_optimal['precision']:.4f}` | `{test_metrics_default['precision']:.4f}` | `{test_metrics_optimal['precision']:.4f}` |
+| **Recall** | `{val_metrics_default['recall']:.4f}` | `{val_metrics_optimal['recall']:.4f}` | `{test_metrics_default['recall']:.4f}` | `{test_metrics_optimal['recall']:.4f}` |
+| **F1 Score** | `{val_metrics_default['f1']:.4f}` | **`{val_metrics_optimal['f1']:.4f}`** | `{test_metrics_default['f1']:.4f}` | **`{test_metrics_optimal['f1']:.4f}`** |
+| **Log-Loss** | `{val_metrics_default['loss']:.4f}` | `{val_metrics_optimal['loss']:.4f}` | `{test_metrics_default['loss']:.4f}` | `{test_metrics_optimal['loss']:.4f}` |
+
+## Test Confusion Matrix (at Val-Optimal Threshold $\\tau = {best_thresh:.2f}$)
+- **True Negatives**: `{test_metrics_optimal['confusion_matrix']['true_negatives']:,}`
+- **False Positives**: `{test_metrics_optimal['confusion_matrix']['false_positives']:,}`
+- **False Negatives**: `{test_metrics_optimal['confusion_matrix']['false_negatives']:,}`
+- **True Positives**: `{test_metrics_optimal['confusion_matrix']['true_positives']:,}`
+"""
+    with open(run_summary_path, "w", encoding="utf-8") as f:
+        f.write(md_content)
+
+    print(f"[Artifacts] Best LoRA model saved:   {checkpoint_dir}")
     print(f"[Artifacts] Training history saved:  {history_path}")
     print(f"[Artifacts] Evaluation summary saved:{summary_path}")
+    print(f"[Artifacts] Run summary (Markdown):  {run_summary_path}")
 
     return {
         "status": "SUCCESS",
         "best_epoch": best_epoch,
         "best_val_roc_auc": best_val_roc_auc,
-        "test_roc_auc": test_metrics_default["roc_auc"],
-        "test_pr_auc": test_metrics_default["pr_auc"],
+        "optimal_val_threshold": best_thresh,
+        "val_metrics_optimal": val_metrics_optimal,
+        "test_metrics_optimal": test_metrics_optimal,
         "checkpoint_dir": str(checkpoint_dir),
         "total_seconds": total_time,
     }
