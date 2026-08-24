@@ -15,8 +15,8 @@ data/processed/*
 !data/processed/.gitkeep
 data/splits/*
 !data/splits/.gitkeep
-workforce-risk-structured-data/
-workforce-risk-structured-data.zip
+workforce-risk-text-data/
+workforce-risk-text-data.zip
 *.parquet
 *.csv
 *.arrow
