@@ -316,17 +316,24 @@ def train_text_transformer(
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments for transformer text training."""
     parser = argparse.ArgumentParser(description="Train DistilBERT + LoRA Text Risk Classifier")
+    parser.add_argument("--train-path", type=str, default=None, help="Path to text train Parquet file")
+    parser.add_argument("--val-path", type=str, default=None, help="Path to text validation Parquet file")
+    parser.add_argument("--test-path", type=str, default=None, help="Path to text test Parquet file")
     parser.add_argument("--smoke-test", action="store_true", help="Run bounded local smoke test (e.g. 200 train / 50 val / 50 test / 1 epoch)")
-    parser.add_argument("--train-sample-size", type=int, default=None, help="Number of training samples")
+    parser.add_argument("--train-sample-size", type=int, default=None, help="Number of training samples (e.g. 5000 or 10000)")
     parser.add_argument("--val-sample-size", type=int, default=None, help="Number of validation samples")
     parser.add_argument("--test-sample-size", type=int, default=None, help="Number of test samples")
     parser.add_argument("--max-length", type=int, default=128, help="Max sequence tokenization length")
     parser.add_argument("--batch-size", type=int, default=None, help="Batch size")
     parser.add_argument("--epochs", type=int, default=None, help="Training epochs")
     parser.add_argument("--lr", type=float, default=None, help="Learning rate")
+    parser.add_argument("--weight-decay", type=float, default=0.01, help="AdamW weight decay")
+    parser.add_argument("--patience", type=int, default=3, help="Early stopping patience")
     parser.add_argument("--device", type=str, default="auto", help="Device (auto, cpu, cuda)")
     parser.add_argument("--lora-r", type=int, default=16, help="LoRA rank")
     parser.add_argument("--lora-alpha", type=int, default=32, help="LoRA alpha")
+    parser.add_argument("--lora-dropout", type=float, default=0.05, help="LoRA dropout")
+    parser.add_argument("--seed", type=int, default=None, help="Random seed")
     parser.add_argument("--artifacts-dir", type=str, default=None, help="Artifacts output directory")
     return parser.parse_args()
 
@@ -337,6 +344,9 @@ if __name__ == "__main__":
     if args.smoke_test:
         print("[CLI] Executing bounded CPU smoke test (200 train / 50 val / 50 test / 1 epoch)...")
         train_text_transformer(
+            train_path=args.train_path,
+            val_path=args.val_path,
+            test_path=args.test_path,
             max_train_samples=args.train_sample_size or 200,
             max_val_samples=args.val_sample_size or 50,
             max_test_samples=args.test_sample_size or 50,
@@ -344,13 +354,20 @@ if __name__ == "__main__":
             batch_size=args.batch_size or 16,
             epochs=args.epochs or 1,
             learning_rate=args.lr or 2e-4,
+            weight_decay=args.weight_decay,
+            patience=args.patience,
             lora_r=args.lora_r,
             lora_alpha=args.lora_alpha,
+            lora_dropout=args.lora_dropout,
             device_str=args.device,
+            seed=args.seed,
             artifacts_dir=args.artifacts_dir or "artifacts/text_transformer_smoke",
         )
     else:
         train_text_transformer(
+            train_path=args.train_path,
+            val_path=args.val_path,
+            test_path=args.test_path,
             max_train_samples=args.train_sample_size,
             max_val_samples=args.val_sample_size,
             max_test_samples=args.test_sample_size,
@@ -358,8 +375,12 @@ if __name__ == "__main__":
             batch_size=args.batch_size,
             epochs=args.epochs,
             learning_rate=args.lr,
+            weight_decay=args.weight_decay,
+            patience=args.patience,
             lora_r=args.lora_r,
             lora_alpha=args.lora_alpha,
+            lora_dropout=args.lora_dropout,
             device_str=args.device,
+            seed=args.seed,
             artifacts_dir=args.artifacts_dir,
         )
