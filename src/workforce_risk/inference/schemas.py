@@ -13,13 +13,13 @@ class RiskTier(str, Enum):
     CRITICAL = "CRITICAL"
 
     @classmethod
-    def from_probability(cls, prob: float, threshold: float = 0.22) -> "RiskTier":
-        """Map continuous fused exit probability to risk tier."""
-        if prob < threshold * 0.8:
+    def from_probability(cls, prob: float, threshold: float = 0.2313) -> "RiskTier":
+        """Map continuous fused exit probability to risk tier calibrated to enterprise attrition distribution."""
+        if prob < threshold * 0.95:
             return cls.LOW
-        elif prob < threshold * 1.5:
+        elif prob < threshold * 1.25:
             return cls.ELEVATED
-        elif prob < 0.60:
+        elif prob < threshold * 1.48:
             return cls.HIGH
         else:
             return cls.CRITICAL

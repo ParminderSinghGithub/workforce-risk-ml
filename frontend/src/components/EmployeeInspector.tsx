@@ -74,17 +74,21 @@ export const EmployeeInspector: React.FC<EmployeeInspectorProps> = ({
         {/* Drawer Header */}
         <div className="drawer-header">
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: '1.125rem', color: 'var(--text-primary)' }}>
+            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+              {employee.persona_name || employee.employee_id}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.2rem', fontSize: '0.8125rem' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text-muted)' }}>
                 {employee.employee_id}
               </span>
-              <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>&bull;</span>
-              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+              <span style={{ color: 'var(--text-muted)' }}>&bull;</span>
+              <span style={{ fontWeight: 600, color: 'var(--brand-light)' }}>
+                {employee.role}
+              </span>
+              <span style={{ color: 'var(--text-muted)' }}>&bull;</span>
+              <span style={{ color: 'var(--text-secondary)' }}>
                 {employee.department}
               </span>
-            </div>
-            <div style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '0.2rem' }}>
-              {employee.role}
             </div>
           </div>
           <button className="btn-ghost" style={{ padding: '0.4rem', borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer' }} onClick={onClose}>

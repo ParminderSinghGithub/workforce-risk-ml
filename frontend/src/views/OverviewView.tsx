@@ -206,7 +206,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   <div style={{ flex: 1, marginRight: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <span style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-primary)' }}>
-                        {emp.employee_id} &bull; {emp.role}
+                        {emp.persona_name || emp.employee_id} <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>({emp.employee_id})</span> &bull; {emp.role}
                       </span>
                     </div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>

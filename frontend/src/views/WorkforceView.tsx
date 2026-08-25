@@ -33,10 +33,11 @@ export const WorkforceView: React.FC<WorkforceViewProps> = ({
     if (selectedTier !== 'ALL' && pred.risk_tier !== selectedTier) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
+      const matchName = (emp.persona_name || '').toLowerCase().includes(q);
       const matchId = (emp.employee_id || '').toLowerCase().includes(q);
       const matchRole = emp.role.toLowerCase().includes(q);
       const matchDept = emp.department.toLowerCase().includes(q);
-      if (!matchId && !matchRole && !matchDept) return false;
+      if (!matchName && !matchId && !matchRole && !matchDept) return false;
     }
     return true;
   }).sort((a, b) => {
@@ -175,8 +176,13 @@ export const WorkforceView: React.FC<WorkforceViewProps> = ({
                     className="clickable-row"
                     onClick={() => pred && onInspectEmployee(emp, pred)}
                   >
-                    <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-primary)' }}>
-                      {emp.employee_id}
+                    <td>
+                      <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {emp.persona_name || emp.employee_id}
+                      </div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        {emp.employee_id}
+                      </div>
                     </td>
                     <td>
                       <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{emp.role}</div>

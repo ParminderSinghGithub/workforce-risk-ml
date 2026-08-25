@@ -95,7 +95,7 @@ export const SimulatorView: React.FC<SimulatorViewProps> = ({ initialEmployee })
           >
             {SAMPLE_EMPLOYEES.map((emp) => (
               <option key={emp.employee_id} value={emp.employee_id}>
-                {emp.employee_id} &bull; {emp.role} ({emp.department})
+                {emp.persona_name || emp.employee_id} ({emp.employee_id}) &bull; {emp.role}
               </option>
             ))}
           </select>
