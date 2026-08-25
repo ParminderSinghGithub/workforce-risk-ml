@@ -43,7 +43,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   // Priority Queue: highest risk first
   const priorityQueue = [...predictions]
     .sort((a, b) => b.fused_risk_probability - a.fused_risk_probability)
-    .slice(0, 4);
+    .slice(0, 5);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
