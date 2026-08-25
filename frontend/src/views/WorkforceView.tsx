@@ -48,16 +48,16 @@ export const WorkforceView: React.FC<WorkforceViewProps> = ({
   });
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* View Header */}
-      <div className="view-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div className="view-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', margin: 0 }}>
         <div>
           <div className="view-title">
             <Users size={22} color="var(--brand-light)" />
-            <span>Workforce Risk Roster</span>
+            <span>Workforce Directory & Cohort Screening</span>
           </div>
           <div className="view-subtitle">
-            Screen and prioritize employees across departments. Click any row to inspect drivers and test retention interventions.
+            Screen and prioritize employees across business units. Click any row to inspect drivers and test retention interventions.
           </div>
         </div>
 
@@ -67,17 +67,17 @@ export const WorkforceView: React.FC<WorkforceViewProps> = ({
         </button>
       </div>
 
-      {/* Filter Toolbar */}
-      <div className="panel" style={{ marginBottom: '1.25rem', padding: '0.875rem 1.25rem' }}>
+      {/* Filter & Search Toolbar */}
+      <div className="panel" style={{ padding: '0.875rem 1.25rem' }}>
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
           {/* Search Box */}
-          <div style={{ flex: 1, minWidth: '220px', position: 'relative' }}>
-            <Search size={14} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+          <div style={{ flex: 1, minWidth: '240px', position: 'relative' }}>
+            <Search size={14} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
               className="form-input"
-              style={{ paddingLeft: '2rem' }}
-              placeholder="Search employee ID, role, or department..."
+              style={{ paddingLeft: '2.25rem' }}
+              placeholder="Search by ID, role title, or department..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -92,7 +92,7 @@ export const WorkforceView: React.FC<WorkforceViewProps> = ({
               onChange={(e) => setSelectedDept(e.target.value)}
             >
               {departments.map((d) => (
-                <option key={d} value={d}>Dept: {d}</option>
+                <option key={d} value={d}>Department: {d}</option>
               ))}
             </select>
           </div>
@@ -125,31 +125,29 @@ export const WorkforceView: React.FC<WorkforceViewProps> = ({
         </div>
       </div>
 
-      {/* Workforce Roster Table */}
+      {/* Roster Table */}
       <div className="data-table-wrapper">
         <table className="data-table">
           <thead>
             <tr>
-              <th>Employee ID</th>
+              <th style={{ width: '130px' }}>Employee</th>
               <th>Role & Department</th>
-              <th>Satisfaction</th>
-              <th>Workload</th>
-              <th>Overtime</th>
-              <th>Exit Probability</th>
-              <th>Risk Tier</th>
-              <th style={{ textAlign: 'right' }}>Action</th>
+              <th>Primary Risk Signal</th>
+              <th style={{ width: '140px' }}>Attrition Risk</th>
+              <th style={{ width: '140px' }}>Risk Status</th>
+              <th style={{ width: '100px', textAlign: 'right' }}>Action</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                <td colSpan={6} style={{ textAlign: 'center', padding: '3.5rem', color: 'var(--text-muted)' }}>
                   Evaluating cohort predictions against Sentinel ML serving engine...
                 </td>
               </tr>
             ) : filteredEmployees.length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                <td colSpan={6} style={{ textAlign: 'center', padding: '3.5rem', color: 'var(--text-muted)' }}>
                   No employees found matching the filter criteria.
                 </td>
               </tr>
@@ -158,6 +156,18 @@ export const WorkforceView: React.FC<WorkforceViewProps> = ({
                 const pred = predictions.find(p => p.employee_id === emp.employee_id);
                 const exitProb = pred ? (pred.fused_risk_probability * 100).toFixed(1) : '—';
                 const tier = pred ? pred.risk_tier : 'LOW';
+
+                // Human-readable primary friction driver
+                let primarySignal = 'Sustainable Workload & Positive Sentiment';
+                if (emp.workload_score > 0.8 && emp.overtime_hours > 15) {
+                  primarySignal = `Extreme Workload (${(emp.workload_score * 100).toFixed(0)}%) & ${emp.overtime_hours}h Overtime`;
+                } else if (emp.satisfaction_score < 0.4) {
+                  primarySignal = `Low Satisfaction (${(emp.satisfaction_score * 100).toFixed(0)}%) & Plateaued Trajectory`;
+                } else if (emp.stress_level > 0.75) {
+                  primarySignal = `Elevated Stress (${(emp.stress_level * 100).toFixed(0)}%) & Overtime Burden`;
+                } else if (emp.workload_score > 0.7) {
+                  primarySignal = `High Workload (${(emp.workload_score * 100).toFixed(0)}%)`;
+                }
 
                 return (
                   <tr
@@ -175,20 +185,12 @@ export const WorkforceView: React.FC<WorkforceViewProps> = ({
                       </div>
                     </td>
                     <td>
-                      <span style={{ color: emp.satisfaction_score < 0.45 ? 'var(--risk-critical)' : 'var(--text-primary)' }}>
-                        {(emp.satisfaction_score * 100).toFixed(0)}%
+                      <span style={{ color: tier !== 'LOW' ? 'var(--risk-elevated)' : 'var(--text-secondary)', fontSize: '0.8125rem', fontWeight: 500 }}>
+                        {primarySignal}
                       </span>
                     </td>
                     <td>
-                      <span style={{ color: emp.workload_score > 0.75 ? 'var(--risk-critical)' : 'var(--text-primary)' }}>
-                        {(emp.workload_score * 100).toFixed(0)}%
-                      </span>
-                    </td>
-                    <td>
-                      <span>{emp.overtime_hours} hrs/wk</span>
-                    </td>
-                    <td>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: '0.9375rem' }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: '1rem', color: tier === 'HIGH' || tier === 'CRITICAL' ? 'var(--risk-critical)' : tier === 'ELEVATED' ? 'var(--risk-elevated)' : 'var(--risk-low)' }}>
                         {exitProb}%
                       </span>
                     </td>

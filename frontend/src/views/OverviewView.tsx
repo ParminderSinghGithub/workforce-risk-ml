@@ -1,9 +1,8 @@
 import React from 'react';
-import { Users, AlertTriangle, TrendingUp, ShieldAlert, ArrowRight } from 'lucide-react';
-import { StatCard } from '../components/StatCard';
-import { RiskBadge } from '../components/RiskBadge';
+import { AlertTriangle, ArrowRight, ShieldAlert } from 'lucide-react';
 import { SAMPLE_EMPLOYEES } from '../constants/sampleData';
 import { EmployeePredictionRequest, PredictionResponse } from '../types/api';
+import { RiskBadge } from '../components/RiskBadge';
 
 interface OverviewViewProps {
   predictions: PredictionResponse[];
@@ -28,7 +27,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     ? (predictions.reduce((acc, p) => acc + p.fused_risk_probability, 0) / predictions.length) * 100
     : 28.5;
 
-  // Department Risk Concentration Breakdown
+  // Department Breakdown
   const deptCounts: Record<string, { total: number; atRisk: number }> = {};
   SAMPLE_EMPLOYEES.forEach((emp) => {
     if (!deptCounts[emp.department]) {
@@ -41,98 +40,123 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     }
   });
 
-  // Priority Queue: Sort by highest risk first
+  // Priority Queue: highest risk first
   const priorityQueue = [...predictions]
     .sort((a, b) => b.fused_risk_probability - a.fused_risk_probability)
     .slice(0, 4);
 
   return (
-    <div>
-      {/* Executive Page Header */}
-      <div className="view-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      {/* Executive Hero Banner & Context */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1.25rem' }}>
         <div>
-          <div className="view-title">
-            <span>Executive Workforce Posture</span>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', padding: '0.25rem 0.65rem', borderRadius: 'var(--radius-full)', backgroundColor: 'var(--risk-critical-bg)', border: '1px solid var(--risk-critical-border)', color: 'var(--risk-critical)', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.75rem' }}>
+            <ShieldAlert size={13} />
+            <span>{criticalHighCount} EMPLOYEES REQUIRE IMMEDIATE RETENTION ATTENTION</span>
           </div>
-          <div className="view-subtitle">
-            Sentinel continuously fuses demographic telemetry and qualitative feedback to detect early-stage turnover risk before formal resignations occur.
-          </div>
+          <h1 style={{ fontSize: '1.875rem', fontWeight: 800, letterSpacing: '-0.025em', color: 'var(--text-primary)', margin: 0 }}>
+            Workforce Retention Posture
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', marginTop: '0.35rem', maxWidth: '680px', lineHeight: 1.5 }}>
+            Sentinel continuously monitors employee demographic telemetry and qualitative review sentiment to forecast organizational attrition risk before formal resignations occur.
+          </p>
         </div>
 
-        <button className="btn btn-primary" onClick={onNavigateToWorkforce}>
-          <span>View All Employees</span>
+        <button className="btn btn-primary" onClick={onNavigateToWorkforce} style={{ padding: '0.625rem 1.25rem', fontSize: '0.875rem' }}>
+          <span>View Full Roster</span>
           <ArrowRight size={15} />
         </button>
       </div>
 
-      {/* KPI Strip */}
-      <div className="grid-4" style={{ marginBottom: '1.75rem' }}>
-        <StatCard
-          label="Total Workforce Assessed"
-          value={isLoading ? '...' : totalMonitored}
-          sublabel="Enterprise sample cohort"
-          icon={<Users size={18} />}
-        />
-        <StatCard
-          label="Immediate Action Required"
-          value={isLoading ? '...' : criticalHighCount}
-          sublabel="High or Critical risk tier"
-          trend={criticalHighCount > 0 ? "Requires Intervention" : "Healthy"}
-          trendType={criticalHighCount > 0 ? "negative" : "positive"}
-          icon={<ShieldAlert size={18} />}
-        />
-        <StatCard
-          label="Elevated Risk Population"
-          value={isLoading ? '...' : elevatedCount}
-          sublabel="Above 21.9% decision cutoff"
-          icon={<AlertTriangle size={18} />}
-        />
-        <StatCard
-          label="Average Exit Probability"
-          value={isLoading ? '...' : `${avgExitRisk.toFixed(1)}%`}
-          sublabel="Calibrated multimodal mean"
-          icon={<TrendingUp size={18} />}
-        />
+      {/* Executive KPI Summary Strip */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem' }}>
+        <div className="panel" style={{ padding: '1.25rem' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Workforce Monitored
+          </div>
+          <div style={{ fontSize: '1.875rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '0.25rem', fontFamily: 'var(--font-sans)', letterSpacing: '-0.02em' }}>
+            {isLoading ? '...' : totalMonitored}
+          </div>
+          <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
+            Enterprise sample cohort
+          </div>
+        </div>
+
+        <div className="panel" style={{ padding: '1.25rem', borderColor: criticalHighCount > 0 ? 'var(--risk-critical-border)' : 'var(--border-subtle)' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Immediate Action Required
+          </div>
+          <div style={{ fontSize: '1.875rem', fontWeight: 800, color: criticalHighCount > 0 ? 'var(--risk-critical)' : 'var(--text-primary)', marginTop: '0.25rem', fontFamily: 'var(--font-sans)', letterSpacing: '-0.02em' }}>
+            {isLoading ? '...' : criticalHighCount}
+          </div>
+          <div style={{ fontSize: '0.8125rem', color: criticalHighCount > 0 ? 'var(--risk-critical)' : 'var(--text-muted)', marginTop: '0.35rem', fontWeight: 600 }}>
+            {criticalHighCount > 0 ? 'Critical / High risk tier' : 'No critical alerts'}
+          </div>
+        </div>
+
+        <div className="panel" style={{ padding: '1.25rem' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Elevated Risk Count
+          </div>
+          <div style={{ fontSize: '1.875rem', fontWeight: 800, color: 'var(--risk-elevated)', marginTop: '0.25rem', fontFamily: 'var(--font-sans)', letterSpacing: '-0.02em' }}>
+            {isLoading ? '...' : elevatedCount}
+          </div>
+          <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
+            Above 21.9% decision cutoff
+          </div>
+        </div>
+
+        <div className="panel" style={{ padding: '1.25rem' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Average Exit Probability
+          </div>
+          <div style={{ fontSize: '1.875rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '0.25rem', fontFamily: 'var(--font-sans)', letterSpacing: '-0.02em' }}>
+            {isLoading ? '...' : `${avgExitRisk.toFixed(1)}%`}
+          </div>
+          <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
+            Calibrated late-fusion mean
+          </div>
+        </div>
       </div>
 
-      {/* Visual Risk Distribution Bar */}
-      <div className="panel" style={{ marginBottom: '1.75rem', padding: '1.25rem 1.5rem' }}>
+      {/* Risk Tier Distribution Bar */}
+      <div className="panel" style={{ padding: '1.25rem 1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
           <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
             Workforce Risk Tier Distribution
           </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            Total Population: {totalMonitored}
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+            N = {totalMonitored} Employees Monitored
           </div>
         </div>
 
-        {/* Stacked Percentage Bar */}
+        {/* Stacked Proportional Bar */}
         <div style={{ display: 'flex', height: '10px', borderRadius: 'var(--radius-full)', overflow: 'hidden', backgroundColor: 'var(--bg-input)' }}>
           <div style={{ width: `${(lowCount / (totalMonitored || 1)) * 100}%`, backgroundColor: 'var(--risk-low)' }} title={`Low Risk: ${lowCount}`} />
           <div style={{ width: `${(elevatedCount / (totalMonitored || 1)) * 100}%`, backgroundColor: 'var(--risk-elevated)' }} title={`Elevated Risk: ${elevatedCount}`} />
           <div style={{ width: `${(criticalHighCount / (totalMonitored || 1)) * 100}%`, backgroundColor: 'var(--risk-critical)' }} title={`High/Critical Risk: ${criticalHighCount}`} />
         </div>
 
-        {/* Legend */}
-        <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.75rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+        {/* Semantic Legend */}
+        <div style={{ display: 'flex', gap: '2rem', marginTop: '0.875rem', fontSize: '0.8125rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--risk-low)' }} />
             <span>Low Risk: <strong>{lowCount}</strong> ({((lowCount / (totalMonitored || 1)) * 100).toFixed(0)}%)</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--risk-elevated)' }} />
             <span>Elevated Risk: <strong>{elevatedCount}</strong> ({((elevatedCount / (totalMonitored || 1)) * 100).toFixed(0)}%)</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--risk-critical)' }} />
             <span>High / Critical: <strong>{criticalHighCount}</strong> ({((criticalHighCount / (totalMonitored || 1)) * 100).toFixed(0)}%)</span>
           </div>
         </div>
       </div>
 
-      {/* Main Grid: Priority Action Queue (Left) & Department Risk Concentration (Right) */}
-      <div className="grid-2">
-        {/* Priority Action Queue */}
+      {/* Priority Action Queue (Left) & Department Risk Breakdown (Right) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
+        {/* Priority Action List */}
         <div className="panel">
           <div className="panel-header">
             <div>
@@ -141,7 +165,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 <span>Priority Action Queue</span>
               </div>
               <div className="panel-subtitle">
-                Employees exhibiting strongest multimodal attrition signals
+                Employees exhibiting highest turnover risk signals
               </div>
             </div>
           </div>
@@ -150,6 +174,18 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             {priorityQueue.map((pred) => {
               const emp = SAMPLE_EMPLOYEES.find(e => e.employee_id === pred.employee_id);
               if (!emp) return null;
+
+              // Generate concise primary risk signal
+              let primarySignal = 'Balanced Telemetry';
+              if (emp.workload_score > 0.8 && emp.overtime_hours > 15) {
+                primarySignal = `Extreme Workload (${(emp.workload_score * 100).toFixed(0)}%) & ${emp.overtime_hours}h Overtime`;
+              } else if (emp.satisfaction_score < 0.4) {
+                primarySignal = `Severe Job Dissatisfaction (${(emp.satisfaction_score * 100).toFixed(0)}%)`;
+              } else if (emp.stress_level > 0.75) {
+                primarySignal = `Elevated Stress (${(emp.stress_level * 100).toFixed(0)}%) & High Queue Volume`;
+              } else if (emp.workload_score > 0.7) {
+                primarySignal = `Heavy Workload Burden (${(emp.workload_score * 100).toFixed(0)}%)`;
+              }
 
               return (
                 <div
@@ -163,21 +199,22 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     borderRadius: 'var(--radius-md)',
                     border: '1px solid var(--border-subtle)',
                     cursor: 'pointer',
-                    transition: 'border-color 0.15s ease',
                   }}
                   className="clickable-row"
                   onClick={() => onInspectEmployee(emp, pred)}
                 >
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-primary)' }}>
-                      {emp.employee_id} &bull; {emp.role}
+                  <div style={{ flex: 1, marginRight: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-primary)' }}>
+                        {emp.employee_id} &bull; {emp.role}
+                      </span>
                     </div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
-                      {emp.department} &bull; Workload: {(emp.workload_score * 100).toFixed(0)}% &bull; Overtime: {emp.overtime_hours}h/wk
+                      {emp.department} &bull; <span style={{ color: 'var(--risk-elevated)', fontWeight: 600 }}>{primarySignal}</span>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: '0.9375rem' }}>
                         {(pred.fused_risk_probability * 100).toFixed(1)}%
@@ -201,7 +238,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 <span>Department Risk Concentration</span>
               </div>
               <div className="panel-subtitle">
-                At-risk population density across organizational units
+                At-risk density across organizational business units
               </div>
             </div>
           </div>

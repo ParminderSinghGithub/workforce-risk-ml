@@ -129,13 +129,24 @@ export const App: React.FC = () => {
       />
 
       {/* Enterprise Footer */}
-      <footer style={{ borderTop: '1px solid var(--border-subtle)', padding: '1.25rem 2rem', textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-        <div style={{ maxWidth: '1360px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <footer style={{ borderTop: '1px solid var(--border-subtle)', padding: '1.5rem 2rem', fontSize: '0.8125rem', color: 'var(--text-muted)', backgroundColor: 'var(--bg-surface)' }}>
+        <div style={{ maxWidth: '1360px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <strong>SENTINEL</strong> &bull; Multimodal Workforce Risk Intelligence Platform &copy; 2026
+            <span style={{ fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>SENTINEL</span>
+            <span style={{ margin: '0 0.5rem' }}>&bull;</span>
+            <span>Built by <strong style={{ color: 'var(--text-primary)' }}>Parminder Singh</strong></span>
+            <span style={{ margin: '0 0.5rem' }}>&bull;</span>
+            <a
+              href="https://github.com/ParminderSinghGithub/Sentinel"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: 'var(--brand-light)', textDecoration: 'none', fontWeight: 600 }}
+            >
+              GitHub: https://github.com/ParminderSinghGithub/Sentinel
+            </a>
           </div>
-          <div style={{ fontFamily: 'var(--font-mono)' }}>
-            PyTorch MLP &bull; DistilBERT + LoRA &bull; Calibrated Late Fusion &bull; FastAPI Serving
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+            PyTorch MLP &bull; DistilBERT + LoRA &bull; Calibrated Late Fusion &bull; FastAPI
           </div>
         </div>
       </footer>
