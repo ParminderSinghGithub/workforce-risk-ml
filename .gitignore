@@ -25,7 +25,10 @@ workforce-risk-text-data.zip
 *.tar.gz
 *.json
 !configs/*.json
+!reports/*.json
 !reports/**/*.json
+!reports/*.csv
+!reports/**/*.csv
 !frontend/*.json
 !frontend/**/*.json
 !*.jsonl

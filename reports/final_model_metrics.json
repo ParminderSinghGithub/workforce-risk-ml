@@ -1,0 +1,113 @@
+{
+  "system_identity": "Sentinel — Multimodal Workforce Risk Intelligence Platform",
+  "audit_timestamp_utc": "2026-08-25T19:30:00Z",
+  "provenance_summary": {
+    "structured_checkpoint": "artifacts/structured_model/best_checkpoint.pt",
+    "structured_eval_source": "artifacts/structured_model/evaluation_summary.json",
+    "text_transformer_checkpoint": "artifacts/text_transformer/best_model",
+    "text_transformer_eval_source": "artifacts/text_transformer/evaluation_summary.json",
+    "text_baseline_checkpoint": "artifacts/text_baseline/tfidf_baseline.joblib",
+    "text_baseline_eval_source": "artifacts/text_baseline/text_baseline_summary.json",
+    "fusion_model_artifact": "artifacts/fusion/fusion_model.joblib",
+    "fusion_eval_source": "artifacts/fusion/evaluation_summary.json",
+    "fusion_test_predictions": "artifacts/fusion/test_predictions.parquet",
+    "tabular_optimization_source": "artifacts/structured_model/optimization_experiments.json"
+  },
+  "dataset_specifications": {
+    "total_corpus_rows": 849999,
+    "structured_split": {
+      "train_rows": 679662,
+      "validation_rows": 85241,
+      "test_rows": 85096,
+      "split_strategy": "Stratified random on left_company"
+    },
+    "text_split": {
+      "train_rows": 679814,
+      "validation_rows": 84988,
+      "test_rows": 85197,
+      "split_strategy": "Grouped disjoint on template_id"
+    },
+    "aligned_dual_holdout": {
+      "validation_rows": 8354,
+      "test_rows": 8463,
+      "properties": "100% employee-disjoint and template-disjoint from all training partitions"
+    }
+  },
+  "final_selected_models": {
+    "structured_tabular_mlp": {
+      "architecture": [128, 64, 32],
+      "dropout": 0.2,
+      "learning_rate": 0.001,
+      "weight_decay": 0.0001,
+      "input_dimension": 380,
+      "target": "left_company",
+      "holdout_test_metrics_n_85096": {
+        "roc_auc": 0.5755,
+        "pr_auc": 0.3313,
+        "base_rate": 0.2843,
+        "log_loss": 0.5899,
+        "brier_score": 0.2008,
+        "optimal_threshold": 0.2469,
+        "precision": 0.3068,
+        "recall": 0.8470,
+        "f1": 0.4507,
+        "true_positives": 20493,
+        "false_positives": 46259,
+        "false_negatives": 3702,
+        "true_negatives": 14642
+      },
+      "checkpoint_path": "artifacts/structured_model/best_checkpoint.pt"
+    },
+    "text_distilbert_lora": {
+      "base_model": "distilbert-base-uncased",
+      "lora_rank": 16,
+      "lora_alpha": 32,
+      "target": "high_burnout_risk",
+      "training_dataset_rows": 679814,
+      "holdout_test_metrics_n_85197": {
+        "roc_auc": 0.7363,
+        "pr_auc": 0.7565,
+        "base_rate": 0.5807,
+        "log_loss": 0.6099,
+        "brier_score": 0.2079,
+        "optimal_threshold": 0.3530,
+        "precision": 0.6726,
+        "recall": 0.8646,
+        "f1": 0.7565,
+        "true_positives": 42777,
+        "false_positives": 20844,
+        "false_negatives": 6700,
+        "true_negatives": 14876
+      },
+      "checkpoint_dir": "artifacts/text_transformer/best_model"
+    },
+    "multimodal_late_fusion": {
+      "meta_classifier": "Calibrated Logistic Meta-Regression on Logit Probabilities",
+      "target": "left_company",
+      "formula": "logit(p_attrition) = 0.0094 + 1.0471 * logit(p_structured) + 0.0272 * logit(p_burnout_text)",
+      "aligned_holdout_test_metrics_n_8463": {
+        "roc_auc": 0.5719,
+        "pr_auc": 0.3387,
+        "base_rate": 0.2883,
+        "log_loss": 0.5942,
+        "brier_score": 0.2026,
+        "optimal_threshold": 0.2313,
+        "precision": 0.3029,
+        "recall": 0.8660,
+        "f1": 0.4488,
+        "true_positives": 2113,
+        "false_positives": 4864,
+        "false_negatives": 327,
+        "true_negatives": 1159
+      },
+      "artifact_path": "artifacts/fusion/fusion_model.joblib"
+    }
+  },
+  "tabular_architecture_experiments_n_85096": {
+    "HistGradientBoosting": { "val_roc_auc": 0.5781, "test_roc_auc": 0.5766, "test_pr_auc": 0.3319, "test_log_loss": 0.5894, "test_brier": 0.2005, "delta_roc_vs_mlp": 0.0011 },
+    "Structured_MLP_Selected": { "val_roc_auc": 0.5777, "test_roc_auc": 0.5755, "test_pr_auc": 0.3313, "test_log_loss": 0.5899, "test_brier": 0.2008 },
+    "MLP_Candidate_A_256": { "val_roc_auc": 0.5776, "test_roc_auc": 0.5753, "test_pr_auc": 0.3313, "test_log_loss": 0.5902, "test_brier": 0.2008 },
+    "MLP_Candidate_B_64": { "val_roc_auc": 0.5779, "test_roc_auc": 0.5757, "test_pr_auc": 0.3317, "test_log_loss": 0.5895, "test_brier": 0.2005 },
+    "MLP_Candidate_C_Wider": { "val_roc_auc": 0.5773, "test_roc_auc": 0.5750, "test_pr_auc": 0.3309, "test_log_loss": 0.5897, "test_brier": 0.2006 }
+  }
+}
