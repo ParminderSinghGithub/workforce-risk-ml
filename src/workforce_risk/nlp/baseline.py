@@ -137,6 +137,11 @@ class TfidfTextBaseline:
         return model
 
 
+def load_text_baseline(filepath: str | Path) -> TfidfTextBaseline:
+    """Load persisted TF-IDF text baseline model artifact from disk."""
+    return TfidfTextBaseline.load(filepath)
+
+
 def train_text_baseline(
     train_path: Optional[str | Path] = None,
     val_path: Optional[str | Path] = None,
