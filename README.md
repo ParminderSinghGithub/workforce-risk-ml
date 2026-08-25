@@ -158,4 +158,39 @@ pip install -r requirements.txt
 
 # 4. Run test suite
 pytest
+
+# 5. Run end-to-end multimodal inference smoke test
+python scripts/predict_sample.py
 ```
+
+---
+
+## Programmatic Inference Quickstart
+
+```python
+from workforce_risk.inference import WorkforceRiskPredictor, EmployeeInput
+
+# 1. Initialize predictor from saved disk artifacts (offline inference ready)
+predictor = WorkforceRiskPredictor.from_artifacts()
+
+# 2. Define employee profile
+employee = EmployeeInput(
+    employee_id="EMP-1001",
+    department="Engineering",
+    job_level="Senior",
+    role="Senior Software Engineer",
+    tenure_months=36.0,
+    salary=135000.0,
+    performance_score=0.88,
+    satisfaction_score=0.85,
+    workload_score=0.45,
+    team_sentiment=0.82,
+    stress_level=0.30,
+    recent_feedback="Great quarter! Feeling very supported by management and love the project direction.",
+)
+
+# 3. Predict attrition risk
+result = predictor.predict_single(employee)
+print(result.to_dict())
+```
+
