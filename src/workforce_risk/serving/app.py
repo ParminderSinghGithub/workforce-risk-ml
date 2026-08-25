@@ -195,7 +195,14 @@ def create_app() -> FastAPI:
                 detail=f"Inference error during batch processing: {str(e)}",
             )
 
+    # Mount compiled frontend distribution if available for full-stack deployment
+    dist_dir = Path(__file__).resolve().parent.parent.parent.parent / "frontend" / "dist"
+    if dist_dir.exists() and (dist_dir / "index.html").exists():
+        from fastapi.staticfiles import StaticFiles
+        app.mount("/", StaticFiles(directory=str(dist_dir), html=True), name="frontend")
+
     return app
 
 
 app = create_app()
+
