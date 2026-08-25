@@ -194,3 +194,83 @@ result = predictor.predict_single(employee)
 print(result.to_dict())
 ```
 
+---
+
+## FastAPI Serving & HTTP Inference API
+
+The system includes a production-grade FastAPI serving layer that loads the trained models once on application startup and performs offline multimodal inference.
+
+### 1. Launch the Serving API
+
+```bash
+python scripts/serve.py --host 127.0.0.1 --port 8000
+```
+Interactive OpenAPI/Swagger documentation is automatically available at `http://127.0.0.1:8000/docs`.
+
+### 2. Health & Model Readiness Check
+
+```bash
+curl -X GET http://127.0.0.1:8000/health
+```
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "version": "0.1.0",
+  "device": "cpu",
+  "models_loaded": {
+    "structured_mlp": true,
+    "text_distilbert_lora": true,
+    "multimodal_late_fusion": true
+  },
+  "decision_threshold": 0.2189,
+  "offline_mode": true
+}
+```
+
+### 3. Single-Employee Prediction Request
+
+```bash
+curl -X POST http://127.0.0.1:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "employee_id": "EMP-1001",
+    "department": "Engineering",
+    "job_level": "Senior",
+    "role": "Senior Software Engineer",
+    "tenure_months": 36.0,
+    "salary": 135000.0,
+    "performance_score": 0.88,
+    "satisfaction_score": 0.85,
+    "workload_score": 0.45,
+    "team_sentiment": 0.82,
+    "stress_level": 0.30,
+    "recent_feedback": "Great quarter! Feeling very supported by management and love the project direction."
+  }'
+```
+
+**Response:**
+```json
+{
+  "employee_id": "EMP-1001",
+  "fused_risk_probability": 0.2403,
+  "structured_risk_probability": 0.4449,
+  "text_risk_probability": 0.2778,
+  "risk_prediction": 1,
+  "risk_tier": "ELEVATED",
+  "decision_threshold": 0.2189,
+  "modality_breakdown": {
+    "structured_weight": 0.181,
+    "text_weight": 0.147,
+    "intercept": -0.9703,
+    "structured_logit": -0.2215,
+    "text_logit": -0.9554,
+    "structured_contribution": -0.0401,
+    "text_contribution": -0.1404
+  },
+  "summary": "Employee EMP-1001 classified as ELEVATED RISK (Fused Risk Probability: 24.03%, Decision Threshold: 0.22). Structured Signal: 44.49%, Text Burnout Signal: 27.78%."
+}
+```
+
+
