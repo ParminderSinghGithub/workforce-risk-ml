@@ -1,49 +1,50 @@
 import React from 'react';
 
 interface StatCardProps {
-  title: string;
+  label: string;
   value: string | number;
-  subtitle?: string;
+  sublabel?: string;
   trend?: string;
   trendType?: 'positive' | 'negative' | 'neutral';
   icon?: React.ReactNode;
 }
 
 export const StatCard: React.FC<StatCardProps> = ({
-  title,
+  label,
   value,
-  subtitle,
+  sublabel,
   trend,
   trendType = 'neutral',
   icon,
 }) => {
   const getTrendColor = () => {
-    if (trendType === 'positive') return 'text-emerald-400';
-    if (trendType === 'negative') return 'text-rose-400';
-    return 'text-slate-400';
+    if (trendType === 'positive') return 'var(--risk-low)';
+    if (trendType === 'negative') return 'var(--risk-critical)';
+    return 'var(--text-muted)';
   };
 
   return (
-    <div className="card" style={{ padding: '1.25rem' }}>
+    <div className="panel" style={{ padding: '1.25rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            {title}
+          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            {label}
           </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '0.25rem', fontFamily: 'var(--font-sans)' }}>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '0.25rem', fontFamily: 'var(--font-sans)', letterSpacing: '-0.02em' }}>
             {value}
           </div>
         </div>
         {icon && (
-          <div style={{ padding: '0.5rem', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-input)', color: 'var(--text-highlight)' }}>
+          <div style={{ padding: '0.5rem', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-surface-raised)', color: 'var(--brand-light)' }}>
             {icon}
           </div>
         )}
       </div>
-      {(subtitle || trend) && (
-        <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          {trend && <span className={getTrendColor()} style={{ fontWeight: 600 }}>{trend}</span>}
-          {subtitle && <span>{subtitle}</span>}
+
+      {(sublabel || trend) && (
+        <div style={{ marginTop: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-muted)', display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+          {trend && <span style={{ fontWeight: 700, color: getTrendColor() }}>{trend}</span>}
+          {sublabel && <span>{sublabel}</span>}
         </div>
       )}
     </div>
