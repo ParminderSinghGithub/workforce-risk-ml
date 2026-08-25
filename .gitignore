@@ -26,6 +26,8 @@ workforce-risk-text-data.zip
 *.json
 !configs/*.json
 !reports/**/*.json
+!frontend/*.json
+!frontend/**/*.json
 !*.jsonl
 
 # Model Artifacts, Checkpoints & Weights
@@ -66,3 +68,9 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# Node / Frontend Caches & Artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+

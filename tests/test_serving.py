@@ -37,6 +37,18 @@ def test_health_endpoints(client: TestClient) -> None:
         assert 0.0 < data["decision_threshold"] < 1.0
 
 
+def test_model_info_endpoints(client: TestClient) -> None:
+    """Verify /model-info and /api/v1/model-info return architecture metadata."""
+    for endpoint in ["/model-info", "/api/v1/model-info"]:
+        response = client.get(endpoint)
+        assert response.status_code == 200
+        data = response.json()
+        assert "Sentinel" in data["platform"]
+        assert "architecture" in data
+        assert "structured_branch" in data["architecture"]
+
+
+
 def test_predict_single_endpoint(client: TestClient) -> None:
     """Verify /predict endpoint returns calibrated multimodal prediction output."""
     payload = {

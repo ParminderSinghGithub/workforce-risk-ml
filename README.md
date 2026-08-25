@@ -1,12 +1,14 @@
-# Workforce Risk ML System
+# Sentinel: Multimodal Workforce Risk Intelligence Platform
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![React 18+](https://img.shields.io/badge/react-18+-61dafb.svg)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/typescript-5.4+-3178c6.svg)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Code Style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-A production-grade multimodal machine learning system for enterprise employee attrition and workforce burnout risk prediction.
+**Sentinel** is an enterprise-grade multimodal machine learning intelligence platform for employee attrition and workforce burnout risk prediction.
 
-The system ingests high-dimensional workforce demographic, compensation, and performance metrics alongside unstructured qualitative feedback text, extracting complementary risk representations through specialized deep learning and NLP models before late-fusion inference.
+The system ingests high-dimensional workforce demographic, compensation, and performance metrics alongside unstructured qualitative feedback text, extracting complementary risk representations through specialized deep learning and transformer NLP models before calibrated late-fusion inference.
+
 
 ---
 
@@ -80,7 +82,7 @@ The system ingests high-dimensional workforce demographic, compensation, and per
 | **Multimodal Fusion**| Late Fusion MLP combining $[p_{\text{structured}}, p_{\text{text}}]$ into calibrated attrition risk |
 | **Data Processing** | PySpark distributed pipeline for data ingestion, cleaning, and Parquet caching |
 | **Serving & Backend**| FastAPI REST API with Pydantic schemas |
-| **User Interface** | Streamlit interactive risk simulator and scenario analyzer |
+| **User Interface** | Sentinel Enterprise Dashboard (React 18, TypeScript, Vite, Enterprise Design System) |
 | **Deployment** | Docker containerized deployment on Oracle Cloud Infrastructure (OCI) Always Free tier |
 | **Model Registry** | Hugging Face Model Hub for adapter and checkpoint distribution |
 
@@ -272,5 +274,44 @@ curl -X POST http://127.0.0.1:8000/predict \
   "summary": "Employee EMP-1001 classified as ELEVATED RISK (Fused Risk Probability: 24.03%, Decision Threshold: 0.22). Structured Signal: 44.49%, Text Burnout Signal: 27.78%."
 }
 ```
+
+---
+
+## Sentinel React + TypeScript Frontend Dashboard
+
+Sentinel includes an enterprise React dashboard providing real-time multimodal workforce risk intelligence, interactive scenario simulation, cohort analytics, and technical transparency.
+
+### 1. Launch the Development Server
+
+```bash
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies (if not already installed)
+npm install
+
+# Start Vite development server (proxies API requests to http://127.0.0.1:8000)
+npm run dev
+```
+
+Open `http://localhost:5173` in your browser.
+
+### 2. Build for Production
+
+```bash
+cd frontend
+npm run build
+npm run preview
+```
+
+### 3. Core Dashboard Features
+
+- **Executive Overview**: High-level workforce population risk distribution, KPI trend cards, and active modality health indicators.
+- **Employee Risk Inspector**: Deep-dive single-employee diagnostic with calibrated probability meter, decision threshold marker, and detailed modality contribution breakdown.
+- **Interactive Scenario Simulator**: What-if policy and feedback commentary simulator evaluating delta risk shifts in real time against the backend inference engine.
+- **Workforce Cohort Table**: High-throughput population filtering, multi-column risk ranking, and rapid inspection.
+- **Methodology & Transparency**: Exact mathematical late-fusion logit formulas, parameter-efficient LoRA specifications, and holdout benchmark comparisons.
+- **System Telemetry & Artifact Health**: Live health verification of loaded model weights and PyTorch execution device.
+
 
 

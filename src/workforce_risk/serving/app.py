@@ -1,8 +1,11 @@
-"""FastAPI application for Workforce Risk ML System multimodal serving."""
+"""FastAPI application for Sentinel — Multimodal Workforce Risk Intelligence Platform."""
 
+import json
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, AsyncGenerator, Dict
 from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from workforce_risk.inference.predictor import WorkforceRiskPredictor
@@ -20,35 +23,44 @@ from workforce_risk.serving.schemas import (
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Lifespan context manager loading model predictor once at server startup."""
-    print("[Serving Startup] Initializing WorkforceRiskPredictor from saved disk artifacts...")
+    print("[Sentinel Startup] Initializing WorkforceRiskPredictor from saved disk artifacts...")
     try:
         predictor = WorkforceRiskPredictor.from_artifacts(device_str="cpu")
         app.state.predictor = predictor
-        print("[Serving Startup] WorkforceRiskPredictor loaded successfully on CPU (Offline mode ready).")
+        print("[Sentinel Startup] WorkforceRiskPredictor loaded successfully on CPU (Offline mode ready).")
     except Exception as e:
-        print(f"[Serving Startup Error] Failed to load predictor artifacts: {e}")
+        print(f"[Sentinel Startup Error] Failed to load predictor artifacts: {e}")
         app.state.predictor = None
 
     yield
 
-    print("[Serving Shutdown] Releasing model resources.")
+    print("[Sentinel Shutdown] Releasing model resources.")
     app.state.predictor = None
 
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI(
-        title="Workforce Risk ML Serving API",
-        description="Production inference service for multimodal employee attrition and burnout risk prediction.",
+        title="Sentinel — Multimodal Workforce Risk Intelligence Platform API",
+        description="Production inference and serving API for enterprise multimodal employee attrition and burnout risk prediction.",
         version="0.1.0",
         lifespan=lifespan,
+    )
+
+    # Enable CORS for local and web frontend clients
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
     @app.get("/", tags=["General"])
     async def root() -> Dict[str, str]:
         """Root endpoint returning service identity and documentation pointers."""
         return {
-            "service": "Workforce Risk ML Serving API",
+            "service": "Sentinel — Multimodal Workforce Risk Intelligence Platform",
             "version": "0.1.0",
             "status": "online",
             "docs_url": "/docs",
@@ -80,6 +92,28 @@ def create_app() -> FastAPI:
             decision_threshold=predictor.fusion_model.optimal_threshold,
             offline_mode=True,
         )
+
+    @app.get("/model-info", tags=["Metadata"])
+    @app.get("/api/v1/model-info", tags=["Metadata"])
+    async def get_model_info() -> Dict[str, Any]:
+        """Expose technical architecture metadata, fusion coefficients, and holdout benchmarks."""
+        eval_path = Path("artifacts/fusion/evaluation_summary.json").resolve()
+        if eval_path.exists():
+            with open(eval_path, "r", encoding="utf-8") as f:
+                eval_data = json.load(f)
+        else:
+            eval_data = {}
+
+        return {
+            "platform": "Sentinel — Multimodal Workforce Risk Intelligence Platform",
+            "version": "0.1.0",
+            "architecture": {
+                "structured_branch": "PyTorch StructuredMLP (Embedding + BatchNorm + Dense + Dropout)",
+                "text_branch": "DistilBERT-base-uncased + PEFT/LoRA (Sequence Classifier, r=16, alpha=32)",
+                "fusion_mechanism": "Calibrated Logistic Meta-Regression over unimodal log-odds",
+            },
+            "evaluation_benchmarks": eval_data,
+        }
 
     @app.post("/predict", response_model=PredictionResponse, tags=["Inference"])
     @app.post("/api/v1/predict", response_model=PredictionResponse, tags=["Inference"])
