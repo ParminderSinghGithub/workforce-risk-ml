@@ -33,19 +33,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies from pyproject.toml
-COPY pyproject.toml ./
+# Copy package metadata, configs, scripts, reports, and Python source tree
+COPY pyproject.toml README.md ./
+COPY src/ ./src/
+COPY configs/ ./configs/
+COPY scripts/ ./scripts/
+COPY reports/ ./reports/
+
+# Install package dependencies and register workforce-risk package
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir .
 
 # Download frozen model artifacts at build time from public Hugging Face repository
 RUN python -c "from huggingface_hub import snapshot_download; snapshot_download('ParminderzHuggingFace/sentinel-workforce-risk-models', local_dir='/app/artifacts', allow_patterns=['structured_model/*', 'text_transformer/*', 'fusion/*', 'evaluation_summary.json'])"
-
-# Copy application source modules, configs, scripts, and reports
-COPY src/ ./src/
-COPY configs/ ./configs/
-COPY scripts/ ./scripts/
-COPY reports/ ./reports/
 
 # Copy compiled production frontend bundle from Stage 1
 COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist

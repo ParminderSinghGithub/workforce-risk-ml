@@ -27,8 +27,9 @@ workforce-risk-text-data/
 *.tar
 *.gz
 
-# Full original artifacts (only staged deployment/artifacts are copied)
+# Local model directories (artifacts are baked at build time from Hugging Face)
 artifacts/
+deployment/
 checkpoints/
 
 # Node caches

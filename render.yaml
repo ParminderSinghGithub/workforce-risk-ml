@@ -1,20 +1,20 @@
 services:
   - type: web
     name: sentinel-workforce-risk
-    env: python
-    buildCommand: "pip install -e . && cd frontend && npm install && npm run build && cd .."
-    startCommand: "python scripts/serve.py"
-    plan: free
+    env: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: standard
     region: oregon
     autoDeploy: true
     envVars:
-      - key: PYTHON_VERSION
-        value: "3.10.14"
-      - key: NODE_VERSION
-        value: "20.12.0"
       - key: ENVIRONMENT
         value: "production"
       - key: ARTIFACTS_DIR
-        value: "artifacts"
+        value: "/app/artifacts"
       - key: HF_MODEL_REPO_ID
         value: "ParminderzHuggingFace/sentinel-workforce-risk-models"
+      - key: TORCH_NUM_THREADS
+        value: "1"
+      - key: TORCH_NUM_INTEROP_THREADS
+        value: "1"
