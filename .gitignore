@@ -31,10 +31,12 @@ workforce-risk-text-data.zip
 !reports/**/*.csv
 !frontend/*.json
 !frontend/**/*.json
+!deployment/*.json
 !*.jsonl
 
 # Model Artifacts, Checkpoints & Weights
 artifacts/
+deployment/artifacts/
 checkpoints/
 *.pt
 *.pth
@@ -77,3 +79,5 @@ frontend/node_modules/
 frontend/dist/
 frontend/.vite/
 
+# Deployment folder (not commited on Github due to memory constraints)
+deployment/

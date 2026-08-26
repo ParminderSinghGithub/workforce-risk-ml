@@ -1,29 +1,45 @@
-.git
+# Git
+.git/
 .gitignore
-.dockerignore
-.venv
-venv
-ENV
-data/raw
-data/processed
-data/splits
-*.parquet
-*.json
-*.arrow
-__pycache__
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+
+# Python caches
+__pycache__/
 *.pyc
 *.pyo
 *.pyd
-.pytest_cache
+.pytest_cache/
 .coverage
-htmlcov
-.vscode
-.idea
+htmlcov/
+
+# Raw and processed datasets (never needed in production container)
+data/
+workforce-risk-text-data/
+*.parquet
+*.csv
+*.arrow
+*.zip
+*.tar
+*.gz
+
+# Full original artifacts (only staged deployment/artifacts are copied)
+artifacts/
+checkpoints/
+
+# Node caches
+frontend/node_modules/
+frontend/.vite/
+
+# Temporary / Scratch
+scratch/
+logs/
+*.log
+.DS_Store
+Thumbs.db
 .env
 .env.*
-logs
-scratch
-*.log
-README.md
-docs
-tests

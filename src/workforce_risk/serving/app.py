@@ -1,6 +1,7 @@
 """FastAPI application for Sentinel — Multimodal Workforce Risk Intelligence Platform."""
 
 import json
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict
@@ -23,9 +24,10 @@ from workforce_risk.serving.schemas import (
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Lifespan context manager loading model predictor once at server startup."""
-    print("[Sentinel Startup] Initializing WorkforceRiskPredictor from saved disk artifacts...")
+    artifacts_dir = os.environ.get("ARTIFACTS_DIR", "artifacts")
+    print(f"[Sentinel Startup] Initializing WorkforceRiskPredictor from saved disk artifacts at: {artifacts_dir}...")
     try:
-        predictor = WorkforceRiskPredictor.from_artifacts(device_str="cpu")
+        predictor = WorkforceRiskPredictor.from_artifacts(artifacts_dir=artifacts_dir, device_str="cpu")
         app.state.predictor = predictor
         print("[Sentinel Startup] WorkforceRiskPredictor loaded successfully on CPU (Offline mode ready).")
     except Exception as e:
@@ -97,7 +99,8 @@ def create_app() -> FastAPI:
     @app.get("/api/v1/model-info", tags=["Metadata"])
     async def get_model_info() -> Dict[str, Any]:
         """Expose technical architecture metadata, fusion coefficients, and holdout benchmarks."""
-        eval_path = Path("artifacts/fusion/evaluation_summary.json").resolve()
+        artifacts_dir = Path(os.environ.get("ARTIFACTS_DIR", "artifacts")).resolve()
+        eval_path = artifacts_dir / "fusion" / "evaluation_summary.json"
         if eval_path.exists():
             with open(eval_path, "r", encoding="utf-8") as f:
                 eval_data = json.load(f)
