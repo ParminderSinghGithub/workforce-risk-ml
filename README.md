@@ -4,314 +4,216 @@
 [![React 18+](https://img.shields.io/badge/react-18+-61dafb.svg)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/typescript-5.4+-3178c6.svg)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-ffd21e.svg)](https://huggingface.co/ParminderzHuggingFace/sentinel-workforce-risk-models)
+[![Kaggle](https://img.shields.io/badge/Kaggle-GPU%20Notebook-20beff.svg)](https://www.kaggle.com/code/parmindersingh2002/workforce-risk-ml-gpu-training)
 
-**Sentinel** is an enterprise-grade multimodal machine learning intelligence platform for employee attrition and workforce burnout risk prediction.
-
-The system ingests high-dimensional workforce demographic, compensation, and performance metrics alongside unstructured qualitative feedback text, extracting complementary risk representations through specialized deep learning and transformer NLP models before calibrated late-fusion inference.
-
+**Sentinel** is an enterprise multimodal machine learning platform designed to predict voluntary employee attrition and workplace burnout risk. By combining high-dimensional structured telemetry (compensation, tenure, performance, overtime, promotions) with qualitative employee feedback text, Sentinel captures organizational attrition patterns alongside subjective psychological distress signals through calibrated late fusion.
 
 ---
 
-## High-Level System Architecture
+## Demo
 
-```
-                                +---------------------------+
-                                |  Raw Workforce Analytics  |
-                                |  (850K Rows, 1.25 GB JSON)|
-                                +-------------+-------------+
-                                              |
-                                              v
-                                +---------------------------+
-                                |    PySpark Engineering    |
-                                | (ETL, Validation, Splits) |
-                                +-------------+-------------+
-                                              |
-                      +-----------------------+-----------------------+
-                      |                                               |
-                      v                                               v
-        +---------------------------+                   +---------------------------+
-        |    Structured Features    |                   |  Employee Feedback Text   |
-        |  (17 Numeric + 5 Cat)     |                   |     (recent_feedback)     |
-        +-------------+-------------+                   +-------------+-------------+
-                      |                                               |
-                      v                                               v
-        +---------------------------+                   +---------------------------+
-        |        PyTorch MLP        |                   |   DistilBERT + PEFT/LoRA  |
-        |  (Embedding + BatchNorm)  |                   |   (Sequence Classifier)   |
-        +-------------+-------------+                   +-------------+-------------+
-                      |                                               |
-                      v                                               v
-        +---------------------------+                   +---------------------------+
-        |       p_structured        |                   |          p_text           |
-        |  (Attrition Probability)  |                   |  (Burnout Risk Estimate)  |
-        +-------------+-------------+                   +-------------+-------------+
-                      |                                               |
-                      +-----------------------+-----------------------+
-                                              |
-                                              v
-                                +---------------------------+
-                                |      Late Fusion MLP      |
-                                |   [p_structured, p_text]  |
-                                +-------------+-------------+
-                                              |
-                                              v
-                                +---------------------------+
-                                |  Final Attrition Risk (p) |
-                                |   & Decision Risk Tier    |
-                                +-------------+-------------+
-                                              |
-                                              v
-                                +---------------------------+
-                                |  FastAPI + Streamlit App  |
-                                |   (Docker on OCI Free)    |
-                                +---------------------------+
+![Sentinel Platform Demo](docs/assets/demo.gif)
+
+---
+
+## 1. Problem & Multimodal Rationale
+
+Enterprise workforce turnover imposes significant replacement and institutional knowledge costs. Traditional attrition prediction models rely exclusively on structured HR databases (e.g. salary, tenure, satisfaction ratings), which often miss qualitative signals of team friction or burnout. Conversely, text feedback alone lacks concrete compensation and demographic context.
+
+Sentinel implements a **calibrated multimodal late-fusion architecture** that processes structured HR records through a PyTorch Deep Neural Network while processing unstructured review text through a fine-tuned DistilBERT transformer with Low-Rank Adaptation (LoRA).
+
+---
+
+## 2. High-Level Architecture
+
+```mermaid
+flowchart TD
+    subgraph Modalities
+        A[Tabular Demographics & Telemetry] --> B[TabularPreprocessor]
+        C[Qualitative Employee Feedback] --> D[DistilBERT Tokenizer]
+    end
+
+    subgraph Unimodal Encoders
+        B -->|380 Encoded Features| E[PyTorch StructuredMLP]
+        D -->|Token IDs + Mask| F[DistilBERT + LoRA Adapter]
+        E -->|Sigmoid| G[p_structured: P_exit]
+        F -->|Sigmoid| H[p_text: P_burnout]
+    end
+
+    subgraph Calibrated Late Fusion
+        G -->|safe_logit| I[Logit Meta-Regression]
+        H -->|safe_logit| I
+        I --> J[Fused Risk Probability P_exit]
+        J --> K[Decision Threshold tau* = 0.2313]
+        K --> L[Risk Tier: Low / Elevated / High / Critical]
+    end
+
+    subgraph Serving Interface
+        L --> M[FastAPI Unified Backend]
+        M --> N[React 18 SPA Frontend Dashboard]
+    end
 ```
 
 ---
 
-## Frozen System Specifications
+## 3. Machine Learning Pipeline Details
 
-| Component | Specification |
-| :--- | :--- |
-| **Dataset Candidate** | [`Umer112233/employee-burnout-turnover-prediction-800k`](https://huggingface.co/datasets/Umer112233/employee-burnout-turnover-prediction-800k) (849,999 records, 1.25 GB) |
-| **Structured Target** | `left_company` (Binary classification: `71.47% False` / `28.53% True`) |
-| **Text Feature Field**| `recent_feedback` (Qualitative employee commentary) |
-| **Text Learning Task**| Binary High-Burnout Risk Classification ($P(\text{burnout\_risk} \ge 0.75 \mid \text{feedback})$) |
-| **Structured Model** | PyTorch Multi-Layer Perceptron (Tabular Embedding + Dense + BatchNorm + Dropout) |
-| **Text Model** | `distilbert-base-uncased` fine-tuned via **PEFT / LoRA** ($r=16, \alpha=32$) |
-| **Multimodal Fusion**| Late Fusion MLP combining $[p_{\text{structured}}, p_{\text{text}}]$ into calibrated attrition risk |
-| **Data Processing** | PySpark distributed pipeline for data ingestion, cleaning, and Parquet caching |
-| **Serving & Backend**| FastAPI REST API with Pydantic schemas |
-| **User Interface** | Sentinel Enterprise Dashboard (React 18, TypeScript, Vite, Enterprise Design System) |
-| **Deployment** | Docker containerized deployment on Oracle Cloud Infrastructure (OCI) Always Free tier |
-| **Model Registry** | Hugging Face Model Hub for adapter and checkpoint distribution |
+### 3.1 Structured Tabular Model (`StructuredMLP`)
+- **Input Dimension**: 380 features (24 continuous numerical metrics + 356 one-hot encoded categorical dimensions).
+- **Topology**: `[380 -> 128 -> 64 -> 32 -> 1]` with BatchNorm1d, ReLU, and Dropout(0.20).
+- **Target**: Voluntary company departure (`left_company`).
+- **Holdout Test Metrics ($N = 85,096$)**: **ROC-AUC: 0.5755**, **PR-AUC: 0.3313**, **Recall at $\tau = 0.2469$: 84.70%**.
 
----
+### 3.2 NLP Text Model (`DistilBERT` + PEFT/LoRA)
+- **Base Architecture**: `distilbert-base-uncased` (66M parameters).
+- **LoRA Configuration**: Rank $r=16$, $\alpha=32$, target modules `q_lin`, `v_lin`, dropout 0.05.
+- **Target**: High burnout risk indicator (`high_burnout_risk`).
+- **Holdout Test Metrics ($N = 85,197$)**: **ROC-AUC: 0.7363**, **PR-AUC: 0.7565**, **Recall at $\tau = 0.3530$: 86.46%**.
 
-## Leakage Prevention Protocol
+### 3.3 Multimodal Late Fusion
+- **Meta-Classifier**: Calibrated Logistic Meta-Regression operating on boundary-clamped log-odds:
+  $$\text{logit}(P_{\text{exit}}) = 0.0094 + 1.0471 \cdot \text{logit}(P_{\text{structured}}) + 0.0272 \cdot \text{logit}(P_{\text{burnout}})$$
+- **Operating Decision Threshold**: $\tau^* = 0.2313$.
+- **Aligned Dual Holdout ($N = 8,463$)**: **ROC-AUC: 0.5719**, **PR-AUC: 0.3387**, **Recall: 86.60%** (2,113 / 2,440 true departures captured).
 
-The following attributes are strictly excluded from structured feature inputs:
+### 3.4 Risk Tier Classification
 
-- `employee_id` — Non-predictive identifier
-- `turnover_reason` — Direct post-exit target leakage
-- `turnover_probability_generated` — Synthetic generator target leakage
-- `risk_factors_summary` — Rule-derived synthetic summary category
-- `burnout_risk` — Reserved as intermediate text-signal training target
-
----
-
-## Explicit Scope Boundaries
-
-This repository is an engineering-first, production-oriented portfolio ML system. To ensure high reliability, maintainability, and clean architecture, the following are **explicitly out of scope**:
-
-- ❌ RAG / Autonomous Agents (LangChain, AutoGen)
-- ❌ Heavy streaming engines (Kafka)
-- ❌ Heavy orchestrators (Airflow, Kubernetes)
-- ❌ Heavy database clusters (PostgreSQL, MongoDB)
-- ❌ Paid third-party APIs (OpenAI, AWS SageMaker)
-- ❌ Microservice over-engineering
+| Risk Tier | Probability Range | Strategic Operational Action |
+| :--- | :---: | :--- |
+| **LOW** | $P < 0.2313$ | Standard annual retention monitoring and career development. |
+| **ELEVATED** | $0.2313 \le P < 0.45$ | Exceeds optimal decision threshold; schedule 1-on-1 check-in. |
+| **HIGH** | $0.45 \le P < 0.70$ | Elevated departure risk; review compensation, workload, and growth. |
+| **CRITICAL** | $P \ge 0.70$ | Severe burnout or imminent resignation; execute retention plan. |
 
 ---
 
-## Project Structure
+## 4. Documentation Index
+
+- [System Architecture](docs/ARCHITECTURE.md): Mathematical formulation of late fusion, unimodal pipelines, and data flow.
+- [Model & Evaluation](docs/MODEL.md): Topologies, training hyperparameters, and holdout benchmark results.
+- [Deployment Guide](docs/DEPLOYMENT.md): Container build, memory analysis, and local/cloud execution.
+- [API Reference](docs/API.md): Request and response schemas for REST endpoints.
+- [Training & Reproduction](docs/TRAINING.md): Dataset preparation, leakage exclusion rules, and GPU training workflow.
+- [Testing Guide](docs/TESTING.md): Pytest test suite breakdown and verified results.
+
+---
+
+## 5. Repository Structure
 
 ```
-workforce-risk-ml-system/
-├── configs/
-│   └── config.yaml             # Central frozen project configuration
-├── data/
-│   ├── raw/                    # Raw source dataset (git-ignored)
-│   ├── processed/              # PySpark processed Parquet files (git-ignored)
-│   └── splits/                 # Train / validation / test splits (git-ignored)
-├── docs/
-│   └── PROJECT_SPEC.md         # Detailed implementation specifications
-├── src/
-│   └── workforce_risk/
-│       ├── __init__.py
-│       ├── config.py           # Pydantic configuration loader & validator
-│       └── utils/
-│           ├── __init__.py
-│           └── seed.py         # Global deterministic seed utility
-├── tests/
-│   └── test_config.py          # Configuration & utility unit tests
-├── .dockerignore
-├── .gitignore
-├── pyproject.toml
-├── requirements.txt
-└── README.md
+Sentinel/
+├── configs/                  # Training, NLP, and fusion YAML configs
+├── deployment/               # Frozen model weights & Hugging Face model card
+│   ├── structured_model/     # PyTorch MLP weights + TabularPreprocessor
+│   ├── text_transformer/     # DistilBERT LoRA adapter + tokenizer files
+│   └── fusion/               # Calibrated LogisticRegression meta-model
+├── docs/                     # Detailed architectural, API, and training documentation
+│   ├── API.md                # Endpoint specifications and example payloads
+│   ├── ARCHITECTURE.md       # Technical system architecture and mathematical formulation
+│   ├── DEPLOYMENT.md         # Deployment configurations, memory breakdown, and guides
+│   ├── MODEL.md              # Model topologies, hyperparameter configurations, metrics
+│   ├── TESTING.md            # Test suite breakdown and verification status
+│   └── TRAINING.md           # Dataset splitting, GPU acceleration, and reproduction
+├── frontend/                 # React 18 + TypeScript + Vite interactive dashboard
+│   ├── src/                  # SPA components, state management, and visualization views
+│   └── package.json          # Node.js dependencies and build scripts
+├── reports/                  # Frozen audit metrics, feature manifests, and evaluation summaries
+├── scripts/                  # Command-line entry points for training, serving, and testing
+│   ├── predict_sample.py     # CLI batch evaluation tool
+│   ├── run_fusion.py         # Late fusion fitting and evaluation
+│   ├── run_structured_training.py # Tabular MLP training script
+│   ├── run_text_training.py  # DistilBERT + LoRA fine-tuning script
+│   └── serve.py              # Production-aware FastAPI web launcher
+├── src/workforce_risk/       # Core Python library
+│   ├── data/                 # Data ingestion, cleaning, and schema definitions
+│   ├── features/             # Feature definitions, extraction, and split generators
+│   ├── fusion/               # Multimodal late fusion model and evaluation
+│   ├── inference/            # Prediction schemas, offline predictor, and category mappings
+│   ├── models/               # Tabular PyTorch MLP, preprocessor, and trainer
+│   ├── nlp/                  # DistilBERT LoRA sequence classifier and tokenization
+│   └── serving/              # FastAPI application, CORS middleware, and static SPA routing
+├── tests/                    # Pytest unit and integration test suite
+├── Dockerfile                # Multi-stage production container definition
+├── pyproject.toml            # Python package dependencies and build specification
+└── render.yaml               # Render service specification
 ```
 
 ---
 
-## Quickstart (Foundation Setup)
+## 6. Local Setup & Execution
+
+### 6.1 Prerequisites
+- Python 3.10+ (Python 3.12 recommended)
+- Node.js 20+ and npm
+- Git
+
+### 6.2 Installation
 
 ```bash
-# 1. Clone repository
-git clone https://github.com/ParminderSinghGithub/workforce-risk-ml.git
-cd workforce-risk-ml
+# Clone the repository
+git clone https://github.com/ParminderSinghGithub/Sentinel.git
+cd Sentinel
 
-# 2. Create and activate virtual environment
+# Create virtual environment and activate
 python -m venv .venv
-source .venv/bin/activate  # Linux/macOS
-# .venv\Scripts\activate   # Windows
+source .venv/bin/activate  # On Windows: .\.venv\Scripts\Activate.ps1
 
-# 3. Install foundation dependencies
-pip install -r requirements.txt
+# Install Python dependencies and package in editable mode
+pip install --upgrade pip
+pip install -e .
 
-# 4. Run test suite
-pytest
-
-# 5. Run end-to-end multimodal inference smoke test
-python scripts/predict_sample.py
-```
-
----
-
-## Programmatic Inference Quickstart
-
-```python
-from workforce_risk.inference import WorkforceRiskPredictor, EmployeeInput
-
-# 1. Initialize predictor from saved disk artifacts (offline inference ready)
-predictor = WorkforceRiskPredictor.from_artifacts()
-
-# 2. Define employee profile
-employee = EmployeeInput(
-    employee_id="EMP-1001",
-    department="Engineering",
-    job_level="Senior",
-    role="Senior Software Engineer",
-    tenure_months=36.0,
-    salary=135000.0,
-    performance_score=0.88,
-    satisfaction_score=0.85,
-    workload_score=0.45,
-    team_sentiment=0.82,
-    stress_level=0.30,
-    recent_feedback="Great quarter! Feeling very supported by management and love the project direction.",
-)
-
-# 3. Predict attrition risk
-result = predictor.predict_single(employee)
-print(result.to_dict())
-```
-
----
-
-## FastAPI Serving & HTTP Inference API
-
-The system includes a production-grade FastAPI serving layer that loads the trained models once on application startup and performs offline multimodal inference.
-
-### 1. Launch the Serving API
-
-```bash
-python scripts/serve.py --host 127.0.0.1 --port 8000
-```
-Interactive OpenAPI/Swagger documentation is automatically available at `http://127.0.0.1:8000/docs`.
-
-### 2. Health & Model Readiness Check
-
-```bash
-curl -X GET http://127.0.0.1:8000/health
-```
-
-**Response:**
-```json
-{
-  "status": "healthy",
-  "version": "0.1.0",
-  "device": "cpu",
-  "models_loaded": {
-    "structured_mlp": true,
-    "text_distilbert_lora": true,
-    "multimodal_late_fusion": true
-  },
-  "decision_threshold": 0.2189,
-  "offline_mode": true
-}
-```
-
-### 3. Single-Employee Prediction Request
-
-```bash
-curl -X POST http://127.0.0.1:8000/predict \
-  -H "Content-Type: application/json" \
-  -d '{
-    "employee_id": "EMP-1001",
-    "department": "Engineering",
-    "job_level": "Senior",
-    "role": "Senior Software Engineer",
-    "tenure_months": 36.0,
-    "salary": 135000.0,
-    "performance_score": 0.88,
-    "satisfaction_score": 0.85,
-    "workload_score": 0.45,
-    "team_sentiment": 0.82,
-    "stress_level": 0.30,
-    "recent_feedback": "Great quarter! Feeling very supported by management and love the project direction."
-  }'
-```
-
-**Response:**
-```json
-{
-  "employee_id": "EMP-1001",
-  "fused_risk_probability": 0.2403,
-  "structured_risk_probability": 0.4449,
-  "text_risk_probability": 0.2778,
-  "risk_prediction": 1,
-  "risk_tier": "ELEVATED",
-  "decision_threshold": 0.2189,
-  "modality_breakdown": {
-    "structured_weight": 0.181,
-    "text_weight": 0.147,
-    "intercept": -0.9703,
-    "structured_logit": -0.2215,
-    "text_logit": -0.9554,
-    "structured_contribution": -0.0401,
-    "text_contribution": -0.1404
-  },
-  "summary": "Employee EMP-1001 classified as ELEVATED RISK (Fused Risk Probability: 24.03%, Decision Threshold: 0.22). Structured Signal: 44.49%, Text Burnout Signal: 27.78%."
-}
-```
-
----
-
-## Sentinel React + TypeScript Frontend Dashboard
-
-Sentinel includes an enterprise React dashboard providing real-time multimodal workforce risk intelligence, interactive scenario simulation, cohort analytics, and technical transparency.
-
-### 1. Launch the Development Server
-
-```bash
-# Navigate to frontend directory
+# Install frontend dependencies and build SPA
 cd frontend
-
-# Install dependencies (if not already installed)
-npm install
-
-# Start Vite development server (proxies API requests to http://127.0.0.1:8000)
-npm run dev
-```
-
-Open `http://localhost:5173` in your browser.
-
-### 2. Build for Production
-
-```bash
-cd frontend
+npm ci
 npm run build
-npm run preview
+cd ..
 ```
 
-### 3. Core Dashboard Features
+### 6.3 Starting the Local Server
 
-- **Executive Overview**: High-level workforce population risk distribution, KPI trend cards, and active modality health indicators.
-- **Employee Risk Inspector**: Deep-dive single-employee diagnostic with calibrated probability meter, decision threshold marker, and detailed modality contribution breakdown.
-- **Interactive Scenario Simulator**: What-if policy and feedback commentary simulator evaluating delta risk shifts in real time against the backend inference engine.
-- **Workforce Cohort Table**: High-throughput population filtering, multi-column risk ranking, and rapid inspection.
-- **Methodology & Transparency**: Exact mathematical late-fusion logit formulas, parameter-efficient LoRA specifications, and holdout benchmark comparisons.
-- **System Telemetry & Artifact Health**: Live health verification of loaded model weights and PyTorch execution device.
+```bash
+python scripts/serve.py
+```
 
+- **Interactive Dashboard**: `http://127.0.0.1:8000/`
+- **Swagger API Docs**: `http://127.0.0.1:8000/docs`
+- **Health Check**: `http://127.0.0.1:8000/health`
 
+---
 
+## 7. Testing & Validation
+
+Run the test suite with `pytest`:
+
+```bash
+pytest tests/ -v
+```
+
+- **Current Status**: **57 / 57 tests passed (100%)**.
+- **Inference Verification**: A 50-employee demo cohort produces the validated distribution: **17 LOW / 18 ELEVATED / 12 HIGH / 3 CRITICAL**.
+
+---
+
+## 8. Model Artifacts & GPU Training
+
+- **Hugging Face Model Repository**: [ParminderzHuggingFace/sentinel-workforce-risk-models](https://huggingface.co/ParminderzHuggingFace/sentinel-workforce-risk-models) (8 files, 4.31 MB total).
+- **Kaggle GPU Training Notebook**: [Workforce Risk ML GPU Training Notebook](https://www.kaggle.com/code/parmindersingh2002/workforce-risk-ml-gpu-training).
+
+---
+
+## 9. Deployment Status & Known Memory Limitation
+
+- **Status**: **Deployment configuration prepared and verified locally; not currently live on cloud free tiers**.
+- **Memory Footprint & Constraint**:
+  - The model weights occupy **4.31 MB** on disk.
+  - At runtime, loading PyTorch, the DistilBERT Transformer, tokenizer vocabulary, and Scikit-Learn pipelines requires approximately **470–485 MB RAM**, with inference peaks reaching **~585–590 MB RAM**.
+  - As a result, deployment on free cloud tiers with a hard 512 MB memory boundary (such as Render Free) triggers Linux cgroup out-of-memory termination.
+  - Oracle Cloud Infrastructure (OCI) Always Free A1 Flex provisioning was tested but encountered tenant host capacity limits in `ap-hyderabad-1`.
+- **Future Deployment Target**: A compute instance or container service with **at least 1.0 GB RAM** (e.g. Render Starter/Standard, AWS ECS, or a basic cloud VM).
+
+---
+
+## 10. License
+
+This project is licensed under the [MIT License](LICENSE).
