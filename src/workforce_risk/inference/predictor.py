@@ -1,5 +1,6 @@
 """Production-grade multimodal inference pipeline for workforce attrition risk prediction."""
 
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 import numpy as np

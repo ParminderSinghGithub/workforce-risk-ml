@@ -102,6 +102,11 @@ def create_app() -> FastAPI:
         """Expose technical architecture metadata, fusion coefficients, and holdout benchmarks."""
         artifacts_dir = Path(os.environ.get("ARTIFACTS_DIR", "artifacts")).resolve()
         eval_path = artifacts_dir / "fusion" / "evaluation_summary.json"
+        if not eval_path.exists():
+            eval_path = artifacts_dir / "evaluation_summary.json"
+        if not eval_path.exists():
+            eval_path = Path(__file__).resolve().parent.parent.parent.parent / "reports" / "final_model_metrics.json"
+
         if eval_path.exists():
             with open(eval_path, "r", encoding="utf-8") as f:
                 eval_data = json.load(f)
@@ -211,17 +216,17 @@ def create_app() -> FastAPI:
 
         @app.get("/", tags=["General"])
         async def root(request: Request) -> Any:
-            """Root endpoint returning SPA UI for browsers or service identity for API tests."""
+            """Root endpoint returning SPA UI for browsers or service identity for API clients."""
             accept = request.headers.get("accept", "")
-            if "application/json" in accept and "text/html" not in accept:
-                return {
-                    "service": "Sentinel — Multimodal Workforce Risk Intelligence Platform",
-                    "version": "0.1.0",
-                    "status": "online",
-                    "docs_url": "/docs",
-                    "health_url": "/health",
-                }
-            return FileResponse(str(index_file))
+            if "text/html" in accept:
+                return FileResponse(str(index_file))
+            return {
+                "service": "Sentinel — Multimodal Workforce Risk Intelligence Platform",
+                "version": "0.1.0",
+                "status": "online",
+                "docs_url": "/docs",
+                "health_url": "/health",
+            }
     else:
         @app.get("/", tags=["General"])
         async def root_fallback() -> Dict[str, str]:

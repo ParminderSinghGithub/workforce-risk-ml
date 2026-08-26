@@ -1,6 +1,7 @@
 """Unit tests for the end-to-end multimodal risk inference pipeline."""
 
 import pytest
+from pathlib import Path
 import numpy as np
 import pandas as pd
 
@@ -122,3 +123,18 @@ def test_predictor_batch_prediction(predictor: WorkforceRiskPredictor) -> None:
     results_df = predictor.predict_batch(df_records)
     assert len(results_df) == 2
     assert results_df[0].fused_risk_probability == results[0].fused_risk_probability
+
+
+def test_predictor_from_artifacts_hf_download_fallback(tmp_path: Path) -> None:
+    """Verify that predictor triggers snapshot_download from Hugging Face when artifacts are missing."""
+    from unittest.mock import patch
+
+    empty_dir = tmp_path / "missing_artifacts"
+
+    with patch("huggingface_hub.snapshot_download") as mock_download:
+        with pytest.raises(FileNotFoundError):
+            # Since mock doesn't create real files, it fails at the FileNotFoundError check after attempting download
+            WorkforceRiskPredictor.from_artifacts(artifacts_dir=empty_dir)
+
+        mock_download.assert_called_once()
+
