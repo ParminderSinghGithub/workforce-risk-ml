@@ -29,6 +29,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         predictor = WorkforceRiskPredictor.from_artifacts(artifacts_dir=artifacts_dir, device_str="cpu")
         app.state.predictor = predictor
+        import gc
+        gc.collect()
         print("[Sentinel Startup] WorkforceRiskPredictor loaded successfully on CPU (Offline mode ready).")
     except Exception as e:
         print(f"[Sentinel Startup Error] Failed to load predictor artifacts: {e}")

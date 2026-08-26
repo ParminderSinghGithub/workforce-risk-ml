@@ -12,6 +12,14 @@ if str(PROJECT_ROOT) not in sys.path:
 
 
 def main() -> None:
+    # Set PyTorch thread allocation to reduce virtual memory footprint in containers
+    try:
+        import torch
+        torch.set_num_threads(int(os.environ.get("TORCH_NUM_THREADS", "1")))
+        torch.set_num_interop_threads(int(os.environ.get("TORCH_NUM_INTEROP_THREADS", "1")))
+    except Exception:
+        pass
+
     parser = argparse.ArgumentParser(description="Launch Workforce Risk ML FastAPI Serving API")
     is_prod = os.environ.get("ENVIRONMENT", "development").lower() in ("production", "prod") or bool(os.environ.get("RENDER"))
     default_host = os.environ.get("HOST", "0.0.0.0" if (is_prod or os.environ.get("PORT")) else "127.0.0.1")
@@ -24,7 +32,7 @@ def main() -> None:
     args = parser.parse_args()
 
     print(f"[Starting Server] Workforce Risk Serving API launching on http://{args.host}:{args.port} (reload={args.reload})")
-    uvicorn.run("workforce_risk.serving.app:app", host=args.host, port=args.port, reload=args.reload)
+    uvicorn.run("workforce_risk.serving.app:app", host=args.host, port=args.port, reload=args.reload, workers=1)
 
 
 if __name__ == "__main__":

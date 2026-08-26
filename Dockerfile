@@ -24,7 +24,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     HOST=0.0.0.0 \
     ENVIRONMENT=production \
     ARTIFACTS_DIR=/app/artifacts \
-    HF_MODEL_REPO_ID=ParminderzHuggingFace/sentinel-workforce-risk-models
+    HF_MODEL_REPO_ID=ParminderzHuggingFace/sentinel-workforce-risk-models \
+    TORCH_NUM_THREADS=1 \
+    TORCH_NUM_INTEROP_THREADS=1
 
 # Install runtime curl for health checks
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -35,6 +37,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml ./
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir .
+
+# Download frozen model artifacts at build time from public Hugging Face repository
+RUN python -c "from huggingface_hub import snapshot_download; snapshot_download('ParminderzHuggingFace/sentinel-workforce-risk-models', local_dir='/app/artifacts', allow_patterns=['structured_model/*', 'text_transformer/*', 'fusion/*', 'evaluation_summary.json'])"
 
 # Copy application source modules, configs, scripts, and reports
 COPY src/ ./src/
