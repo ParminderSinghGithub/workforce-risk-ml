@@ -58,9 +58,10 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    @app.get("/", tags=["General"])
-    async def root() -> Dict[str, str]:
-        """Root endpoint returning service identity and documentation pointers."""
+    @app.get("/api", tags=["General"])
+    @app.get("/api/v1", tags=["General"])
+    async def api_info() -> Dict[str, str]:
+        """API metadata endpoint returning service identity and documentation pointers."""
         return {
             "service": "Sentinel — Multimodal Workforce Risk Intelligence Platform",
             "version": "0.1.0",
@@ -200,9 +201,38 @@ def create_app() -> FastAPI:
 
     # Mount compiled frontend distribution if available for full-stack deployment
     dist_dir = Path(__file__).resolve().parent.parent.parent.parent / "frontend" / "dist"
-    if dist_dir.exists() and (dist_dir / "index.html").exists():
+    index_file = dist_dir / "index.html"
+    if dist_dir.exists() and index_file.exists():
         from fastapi.staticfiles import StaticFiles
-        app.mount("/", StaticFiles(directory=str(dist_dir), html=True), name="frontend")
+        from fastapi.responses import FileResponse
+
+        if (dist_dir / "assets").exists():
+            app.mount("/assets", StaticFiles(directory=str(dist_dir / "assets")), name="assets")
+
+        @app.get("/", tags=["General"])
+        async def root(request: Request) -> Any:
+            """Root endpoint returning SPA UI for browsers or service identity for API tests."""
+            accept = request.headers.get("accept", "")
+            if "application/json" in accept and "text/html" not in accept:
+                return {
+                    "service": "Sentinel — Multimodal Workforce Risk Intelligence Platform",
+                    "version": "0.1.0",
+                    "status": "online",
+                    "docs_url": "/docs",
+                    "health_url": "/health",
+                }
+            return FileResponse(str(index_file))
+    else:
+        @app.get("/", tags=["General"])
+        async def root_fallback() -> Dict[str, str]:
+            """Root endpoint returning service identity when frontend is not compiled."""
+            return {
+                "service": "Sentinel — Multimodal Workforce Risk Intelligence Platform",
+                "version": "0.1.0",
+                "status": "online",
+                "docs_url": "/docs",
+                "health_url": "/health",
+            }
 
     return app
 

@@ -57,6 +57,20 @@ class WorkforceRiskPredictor:
         text_model_dir = root / "text_transformer" / "best_model"
         fusion_model_path = root / "fusion" / "fusion_model.joblib"
 
+        if not struct_ckpt_path.exists() or not text_model_dir.exists() or not fusion_model_path.exists():
+            repo_id = os.environ.get("HF_MODEL_REPO_ID", "ParminderzHuggingFace/sentinel-workforce-risk-models")
+            if repo_id:
+                try:
+                    from huggingface_hub import snapshot_download
+                    print(f"[Model Loader] Local artifacts missing at '{root}'. Fetching inference package from Hugging Face '{repo_id}'...")
+                    snapshot_download(
+                        repo_id=repo_id,
+                        local_dir=str(root),
+                        allow_patterns=["structured_model/*", "text_transformer/*", "fusion/*", "evaluation_summary.json"]
+                    )
+                except Exception as e:
+                    print(f"[Model Loader Warning] Failed to download from Hugging Face '{repo_id}': {e}")
+
         if not struct_ckpt_path.exists():
             raise FileNotFoundError(f"Missing structured checkpoint: {struct_ckpt_path}")
         if not text_model_dir.exists():
